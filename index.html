@@ -175,6 +175,25 @@ const audio = {
     // Auto-discover gameplay tracks by probing track1.mp3 through track50.mp3
     this.probeGameplayTracks();
     this.probeBonusTracks();
+
+    // Mobile audio unlock — must happen during a user gesture
+    this.unlocked = false;
+    const self = this;
+    function unlock() {
+      if (self.unlocked) return;
+      self.unlocked = true;
+      // Play and pause to unlock audio elements on iOS/Android
+      [self.menu, self.gameover].forEach(function(a) {
+        if (a) {
+          a.volume = 0;
+          a.play().then(function() { a.pause(); a.currentTime = 0; a.volume = self.volume; }).catch(function(){});
+        }
+      });
+      document.removeEventListener('touchstart', unlock);
+      document.removeEventListener('click', unlock);
+    }
+    document.addEventListener('touchstart', unlock, { once: true });
+    document.addEventListener('click', unlock, { once: true });
   },
 
   probeGameplayTracks() {
@@ -235,7 +254,15 @@ const audio = {
 
   playMenu() {
     this.stopAll();
-    try { this.menu.play().catch(()=>{}); } catch(e) {}
+    this.menu.volume = this.volume;
+    const self = this;
+    this.menu.play().then(function(){}).catch(function(){
+      // If blocked, try again on next user interaction
+      document.addEventListener('touchstart', function retry() {
+        self.menu.play().catch(function(){});
+        document.removeEventListener('touchstart', retry);
+      }, { once: true });
+    });
   },
 
   playGameplay() {
@@ -248,7 +275,7 @@ const audio = {
     this.currentTrack.addEventListener('ended', () => {
       this.playGameplay();
     });
-    try { this.currentTrack.play().catch(()=>{}); } catch(e) {}
+    this.currentTrack.play().catch(()=>{});
   },
 
   playBonus() {
@@ -259,24 +286,23 @@ const audio = {
       this.bonus.volume = this.volume;
       this.bonus.loop = false;
     } else {
-      // Fallback to single bonus.mp3
       this.bonus = new Audio('music/bonus.mp3');
       this.bonus.volume = this.volume;
       this.bonus.loop = true;
     }
-    try { this.bonus.play().catch(()=>{}); } catch(e) {}
+    this.bonus.play().catch(()=>{});
   },
 
   resumeGameplay() {
     if (this.bonus) { this.bonus.pause(); this.bonus.currentTime = 0; }
     if (this.currentTrack) {
-      try { this.currentTrack.play().catch(()=>{}); } catch(e) {}
+      this.currentTrack.play().catch(()=>{});
     }
   },
 
   playGameover() {
     this.stopAll();
-    try { this.gameover.play().catch(()=>{}); } catch(e) {}
+    this.gameover.play().catch(()=>{});
   }
 };
 
@@ -1260,6 +1286,7 @@ function startBonusTransition() {
   iframe.id = 'bonusFrame';
   iframe.src = 'bonus_stage.html?autostart';
   iframe.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;border:none;z-index:100;';
+  iframe.setAttribute('allow', 'accelerometer; gyroscope');
   iframe.onload = function() { iframe.contentWindow.focus(); iframe.focus(); };
   document.body.appendChild(iframe);
   iframe.focus();

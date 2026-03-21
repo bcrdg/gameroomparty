@@ -36,6 +36,7 @@ var state = 'ready';
 var bon = null;
 var keys = {};
 var touchDir = 0;
+var tiltX = 0;
 var score = 0;
 var bestScore = 0;
 
@@ -355,6 +356,37 @@ canvas.addEventListener('touchstart',function(e){
 canvas.addEventListener('touchmove',function(e){e.preventDefault();touchDir=e.touches[0].clientX<W/2?-1:1;});
 canvas.addEventListener('touchend',function(){touchDir=0;});
 
+// ═══ TILT CONTROLS ═══
+var tiltEnabled = false;
+var TILT_DEADZONE = 3;
+var TILT_MAX = 25;
+
+function handleOrientation(e) {
+  var g = e.gamma || 0;
+  if (Math.abs(g) < TILT_DEADZONE) { tiltX = 0; return; }
+  var sign = g > 0 ? 1 : -1;
+  var adj = (Math.abs(g) - TILT_DEADZONE) / (TILT_MAX - TILT_DEADZONE);
+  tiltX = sign * Math.min(adj, 1);
+}
+
+function requestTilt() {
+  if (tiltEnabled) return;
+  if (typeof DeviceOrientationEvent !== 'undefined' &&
+      typeof DeviceOrientationEvent.requestPermission === 'function') {
+    DeviceOrientationEvent.requestPermission().then(function(state) {
+      if (state === 'granted') {
+        window.addEventListener('deviceorientation', handleOrientation);
+        tiltEnabled = true;
+      }
+    }).catch(function(){});
+  } else if (window.DeviceOrientationEvent) {
+    window.addEventListener('deviceorientation', handleOrientation);
+    tiltEnabled = true;
+  }
+}
+
+canvas.addEventListener('touchstart', function(){ requestTilt(); }, {once:true});
+
 // ═══ UPDATE ═══
 function update() {
   if(state!=='playing'||!bon) return;
@@ -371,6 +403,7 @@ function update() {
   if(keys['ArrowLeft']||keys['a']||keys['A']) steer=-1;
   if(keys['ArrowRight']||keys['d']||keys['D']) steer=1;
   if(touchDir!==0) steer=touchDir;
+  if(tiltX!==0) steer=tiltX;
 
   b.tl+=steer*0.04;
   if(b.tl>0.85) b.tl=0.85;
