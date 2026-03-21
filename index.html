@@ -102,7 +102,7 @@
   </div>
 </div>
 <script>var GAMEPLAY_TRACKS = GAMEPLAY_TRACKS || [];</script>
-<script src="music/gameplay/tracks.js" onerror="console.warn('tracks.js not found')"></script>
+<script src="Music/gameplay/tracks.js" onerror="console.warn('tracks.js not found')"></script>
 <script>var BLOCKED_WORDS = BLOCKED_WORDS || [];</script>
 <script src="blocked_words.js" onerror="console.warn('blocked_words.js not found')"></script>
 <script>
@@ -162,7 +162,7 @@ const audio = {
   ctx: null, // AudioContext for mobile unlock
 
   init() {
-    this.menu = new Audio('music/menu.mp3');
+    this.menu = new Audio('Music/menu.mp3');
     this.menu.loop = true;
     this.menu.volume = this.volume;
     this.menu.addEventListener('error', function(){ console.warn('menu.mp3 not found or failed to load'); });
@@ -170,7 +170,7 @@ const audio = {
     this.bonus = null;
     this.bonusTracks = [];
 
-    this.gameover = new Audio('music/gameover.mp3');
+    this.gameover = new Audio('Music/gameover.mp3');
     this.gameover.loop = false;
     this.gameover.volume = this.volume;
     this.gameover.addEventListener('error', function(){ console.warn('gameover.mp3 not found or failed to load'); });
@@ -189,7 +189,7 @@ const audio = {
 
   probeGameplayTracks() {
     for (let i = 1; i <= 50; i++) {
-      const path = 'music/gameplay/track' + i + '.mp3';
+      const path = 'Music/gameplay/track' + i + '.mp3';
       const a = new Audio();
       a.preload = 'metadata';
       a.addEventListener('loadedmetadata', () => {
@@ -200,7 +200,7 @@ const audio = {
     }
     if (typeof GAMEPLAY_TRACKS !== 'undefined' && GAMEPLAY_TRACKS.length > 0) {
       for (const f of GAMEPLAY_TRACKS) {
-        this.gameplayTracks.push('music/gameplay/' + f);
+        this.gameplayTracks.push('Music/gameplay/' + f);
       }
     }
     this.loaded = true;
@@ -208,7 +208,7 @@ const audio = {
 
   probeBonusTracks() {
     for (let i = 1; i <= 20; i++) {
-      const path = 'music/bonus/track' + i + '.mp3';
+      const path = 'Music/bonus/track' + i + '.mp3';
       const a = new Audio();
       a.preload = 'metadata';
       a.addEventListener('loadedmetadata', () => {
@@ -284,7 +284,7 @@ const audio = {
       this.bonus.volume = this.volume;
       this.bonus.loop = false;
     } else {
-      this.bonus = new Audio('music/bonus.mp3');
+      this.bonus = new Audio('Music/bonus.mp3');
       this.bonus.volume = this.volume;
       this.bonus.loop = true;
     }
