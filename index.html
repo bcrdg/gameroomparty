@@ -159,42 +159,33 @@ const audio = {
   currentTrack: null,
   loaded: false,
   volume: 0.6,
+  ctx: null, // AudioContext for mobile unlock
 
   init() {
     this.menu = new Audio('music/menu.mp3');
     this.menu.loop = true;
     this.menu.volume = this.volume;
+    this.menu.addEventListener('error', function(){ console.warn('menu.mp3 not found or failed to load'); });
 
-    this.bonus = null; // will be set randomly
+    this.bonus = null;
     this.bonusTracks = [];
 
     this.gameover = new Audio('music/gameover.mp3');
     this.gameover.loop = false;
     this.gameover.volume = this.volume;
+    this.gameover.addEventListener('error', function(){ console.warn('gameover.mp3 not found or failed to load'); });
 
-    // Auto-discover gameplay tracks by probing track1.mp3 through track50.mp3
     this.probeGameplayTracks();
     this.probeBonusTracks();
 
-    // Mobile audio unlock — must happen during a user gesture
-    this.unlocked = false;
-    const self = this;
-    function unlock() {
-      if (self.unlocked) return;
-      self.unlocked = true;
-      // Play and pause to unlock audio elements on iOS/Android
-      [self.menu, self.gameover].forEach(function(a) {
-        if (a) {
-          a.volume = 0;
-          a.play().then(function() { a.pause(); a.currentTime = 0; a.volume = self.volume; }).catch(function(){});
-        }
-      });
-      document.removeEventListener('touchstart', unlock);
-      document.removeEventListener('click', unlock);
-    }
-    document.addEventListener('touchstart', unlock, { once: true });
-    document.addEventListener('click', unlock, { once: true });
+    // Create AudioContext for mobile unlock
+    try {
+      this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+    } catch(e) {}
   },
+
+  // Call this.ctx.resume() chained before play() calls — see each play method
+
 
   probeGameplayTracks() {
     for (let i = 1; i <= 50; i++) {
@@ -255,27 +246,34 @@ const audio = {
   playMenu() {
     this.stopAll();
     this.menu.volume = this.volume;
-    const self = this;
-    this.menu.play().then(function(){}).catch(function(){
-      // If blocked, try again on next user interaction
-      document.addEventListener('touchstart', function retry() {
-        self.menu.play().catch(function(){});
-        document.removeEventListener('touchstart', retry);
-      }, { once: true });
-    });
+    this.menu.currentTime = 0;
+    const m = this.menu;
+    if (this.ctx && this.ctx.state === 'suspended') {
+      this.ctx.resume().then(function(){
+        m.play().then(function(){ console.log('Menu music playing'); }).catch(function(e){ console.warn('Menu play failed:', e); });
+      });
+    } else {
+      m.play().then(function(){ console.log('Menu music playing'); }).catch(function(e){ console.warn('Menu play failed:', e); });
+    }
   },
 
   playGameplay() {
     this.stopAll();
-    if (this.gameplayTracks.length === 0) return;
+    if (this.gameplayTracks.length === 0) { console.warn('No gameplay tracks found'); return; }
     const idx = Math.floor(Math.random() * this.gameplayTracks.length);
+    console.log('Playing gameplay track:', this.gameplayTracks[idx]);
     this.currentTrack = new Audio(this.gameplayTracks[idx]);
     this.currentTrack.volume = this.volume;
     this.currentTrack.loop = false;
-    this.currentTrack.addEventListener('ended', () => {
-      this.playGameplay();
-    });
-    this.currentTrack.play().catch(()=>{});
+    const self = this;
+    this.currentTrack.addEventListener('ended', function() { self.playGameplay(); });
+    this.currentTrack.addEventListener('error', function(e){ console.warn('Track load error:', e); });
+    if (this.ctx && this.ctx.state === 'suspended') {
+      const t = this.currentTrack;
+      this.ctx.resume().then(function(){ t.play().catch(function(e){ console.warn('Gameplay play failed:', e); }); });
+    } else {
+      this.currentTrack.play().catch(function(e){ console.warn('Gameplay play failed:', e); });
+    }
   },
 
   playBonus() {
@@ -290,19 +288,25 @@ const audio = {
       this.bonus.volume = this.volume;
       this.bonus.loop = true;
     }
-    this.bonus.play().catch(()=>{});
+    this.bonus.play().catch(function(e){ console.warn('Bonus play failed:', e); });
   },
 
   resumeGameplay() {
     if (this.bonus) { this.bonus.pause(); this.bonus.currentTime = 0; }
     if (this.currentTrack) {
-      this.currentTrack.play().catch(()=>{});
+      this.currentTrack.play().catch(function(e){ console.warn('Resume failed:', e); });
     }
   },
 
   playGameover() {
     this.stopAll();
-    this.gameover.play().catch(()=>{});
+    this.gameover.currentTime = 0;
+    if (this.ctx && this.ctx.state === 'suspended') {
+      const g = this.gameover;
+      this.ctx.resume().then(function(){ g.play().catch(function(e){ console.warn('Gameover play failed:', e); }); });
+    } else {
+      this.gameover.play().catch(function(e){ console.warn('Gameover play failed:', e); });
+    }
   }
 };
 
@@ -476,9 +480,16 @@ function loadHighScores() {
   hsLoaded = true;
 
   // 2. Fetch from JSONBin in background, merge when it arrives
+  if (window.location.protocol === 'file:') {
+    console.warn('Running on file:// — JSONBin sync disabled. Host on https:// for cloud scores.');
+    return;
+  }
   fetch(JSONBIN_URL + '/latest', {
     headers: { 'X-Master-Key': JSONBIN_KEY }
-  }).then(function(r){ return r.json(); })
+  }).then(function(r){
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    return r.json();
+  })
     .then(function(data) {
       const remote = data.record || data;
       const remoteAll = remote.allTime || [];
@@ -509,6 +520,9 @@ function saveLocal() {
 function saveHighScores() {
   // Save to localStorage immediately
   saveLocal();
+
+  // Skip cloud save on file://
+  if (window.location.protocol === 'file:') return;
 
   // Save to JSONBin in background
   const payload = {
@@ -960,6 +974,10 @@ canvas.addEventListener('touchstart',e=>{
       const col = Math.floor((tx - kbStartX) / cellW);
 
       if (row >= 0 && row <= 3) {
+        // Move cursor highlight to tapped cell
+        nameEntry.cursor.row = row;
+        nameEntry.cursor.col = row < 3 ? Math.min(col, HS_COLS - 1) : Math.min(col, 8);
+
         if (row < 3) {
           // Letter row
           const idx = row * HS_COLS + col;
@@ -1015,10 +1033,16 @@ function handleOrientation(e) {
   // gamma = left/right tilt (-90 to 90)
   let g = e.gamma || 0;
   // Clamp and apply deadzone
-  if (Math.abs(g) < TILT_DEADZONE) { tiltX = 0; return; }
-  const sign = g > 0 ? 1 : -1;
-  const adj = (Math.abs(g) - TILT_DEADZONE) / (TILT_MAX - TILT_DEADZONE);
-  tiltX = sign * Math.min(adj, 1);
+  if (Math.abs(g) < TILT_DEADZONE) { tiltX = 0; } else {
+    const sign = g > 0 ? 1 : -1;
+    const adj = (Math.abs(g) - TILT_DEADZONE) / (TILT_MAX - TILT_DEADZONE);
+    tiltX = sign * Math.min(adj, 1);
+  }
+  // Forward tilt to bonus iframe if active
+  const bf = document.getElementById('bonusFrame');
+  if (bf && bf.contentWindow) {
+    bf.contentWindow.postMessage({ type: 'tilt', tiltX: tiltX }, '*');
+  }
 }
 
 function requestTilt() {

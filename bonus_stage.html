@@ -387,6 +387,13 @@ function requestTilt() {
 
 canvas.addEventListener('touchstart', function(){ requestTilt(); }, {once:true});
 
+// Receive tilt data from parent window (when running in iframe)
+window.addEventListener('message', function(e) {
+  if (e.data && e.data.type === 'tilt') {
+    tiltX = e.data.tiltX;
+  }
+});
+
 // ═══ UPDATE ═══
 function update() {
   if(state!=='playing'||!bon) return;
