@@ -432,7 +432,34 @@ const HS_KEYBOARD = [
 ];
 const HS_COLS = 9;
 
+// ═══════════════════════════════════════
+// JSONBIN.IO CLOUD LEADERBOARD
+// ═══════════════════════════════════════
+const JSONBIN_ID = '69be3149aa77b81da9048911';
+const JSONBIN_KEY = '$2a$10$4P1wMAYtEsfKJ5I6Kb7GJ.1sMWRCZtt.uFeGXZF51xNEJwVmj2C0.';
+const JSONBIN_URL = 'https://api.jsonbin.io/v3/b/' + JSONBIN_ID;
+
+function getWeekKey() {
+  const now = new Date();
+  const weekStart = new Date(now); weekStart.setDate(now.getDate() - now.getDay());
+  return weekStart.toISOString().slice(0,10);
+}
+
+function mergeScores(local, remote) {
+  // Combine both lists, deduplicate by name+score+date, keep top 20
+  const all = local.concat(remote);
+  const seen = {};
+  const unique = [];
+  for (let i = 0; i < all.length; i++) {
+    const key = all[i].name + '|' + all[i].score + '|' + all[i].date;
+    if (!seen[key]) { seen[key] = true; unique.push(all[i]); }
+  }
+  unique.sort(function(a,b){ return b.score - a.score; });
+  return unique.slice(0, 20);
+}
+
 function loadHighScores() {
+  // 1. Load from localStorage instantly (cache)
   try {
     const at = localStorage.getItem('grp-hs-alltime');
     allTimeScores = at ? JSON.parse(at) : [];
@@ -441,27 +468,67 @@ function loadHighScores() {
     const wk = localStorage.getItem('grp-hs-weekly');
     if (wk) {
       const data = JSON.parse(wk);
-      const now = new Date();
-      const weekStart = new Date(now); weekStart.setDate(now.getDate() - now.getDay());
-      const weekKey = weekStart.toISOString().slice(0,10);
-      if (data.week === weekKey) {
+      if (data.week === getWeekKey()) {
         weeklyScores = data.scores;
-      } else {
-        weeklyScores = [];
-      }
+      } else { weeklyScores = []; }
     } else { weeklyScores = []; }
   } catch(e) { weeklyScores = []; }
   hsLoaded = true;
+
+  // 2. Fetch from JSONBin in background, merge when it arrives
+  fetch(JSONBIN_URL + '/latest', {
+    headers: { 'X-Master-Key': JSONBIN_KEY }
+  }).then(function(r){ return r.json(); })
+    .then(function(data) {
+      const remote = data.record || data;
+      const remoteAll = remote.allTime || [];
+      const remoteWeekly = remote.weekly || { week: '', scores: [] };
+
+      // Merge remote into local
+      allTimeScores = mergeScores(allTimeScores, remoteAll);
+
+      if (remoteWeekly.week === getWeekKey()) {
+        weeklyScores = mergeScores(weeklyScores, remoteWeekly.scores);
+      }
+
+      // Update localStorage with merged data
+      saveLocal();
+      console.log('Cloud scores loaded: ' + allTimeScores.length + ' all-time');
+    }).catch(function(e) {
+      console.warn('JSONBin fetch failed, using local scores:', e);
+    });
+}
+
+function saveLocal() {
+  try {
+    localStorage.setItem('grp-hs-alltime', JSON.stringify(allTimeScores.slice(0,20)));
+    localStorage.setItem('grp-hs-weekly', JSON.stringify({week:getWeekKey(), scores:weeklyScores.slice(0,20)}));
+  } catch(e) {}
 }
 
 function saveHighScores() {
-  try {
-    localStorage.setItem('grp-hs-alltime', JSON.stringify(allTimeScores.slice(0,20)));
-    const now = new Date();
-    const weekStart = new Date(now); weekStart.setDate(now.getDate() - now.getDay());
-    const weekKey = weekStart.toISOString().slice(0,10);
-    localStorage.setItem('grp-hs-weekly', JSON.stringify({week:weekKey, scores:weeklyScores.slice(0,20)}));
-  } catch(e) {}
+  // Save to localStorage immediately
+  saveLocal();
+
+  // Save to JSONBin in background
+  const payload = {
+    allTime: allTimeScores.slice(0, 20),
+    weekly: { week: getWeekKey(), scores: weeklyScores.slice(0, 20) }
+  };
+
+  fetch(JSONBIN_URL, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Master-Key': JSONBIN_KEY
+    },
+    body: JSON.stringify(payload)
+  }).then(function(r){
+    if (r.ok) console.log('Scores saved to cloud');
+    else console.warn('JSONBin save failed:', r.status);
+  }).catch(function(e) {
+    console.warn('JSONBin save failed:', e);
+  });
 }
 
 function qualifiesForHighScore(s) {
@@ -870,6 +937,61 @@ document.addEventListener('keydown',e=>{
 document.addEventListener('keyup',e=>{keys[e.key]=false;});
 canvas.addEventListener('touchstart',e=>{
   e.preventDefault();
+
+  // Name entry touch handling
+  if (nameEntry && !nameEntry.done) {
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = W / rect.width;
+    const scaleY = H / rect.height;
+    const tx = (e.touches[0].clientX - rect.left) * scaleX;
+    const ty = (e.touches[0].clientY - rect.top) * scaleY;
+
+    // Same layout as renderNameEntry
+    const kbTop = H * 0.38;
+    const kbBottom = H * 0.92;
+    const kbHeight = kbBottom - kbTop;
+    const totalRows = 4;
+    const cellH = Math.floor(kbHeight / totalRows);
+    const cellW = Math.floor((W - 20*S) / HS_COLS);
+    const kbStartX = (W - cellW * HS_COLS) / 2;
+
+    if (ty >= kbTop && ty <= kbBottom && tx >= kbStartX && tx <= kbStartX + cellW * HS_COLS) {
+      const row = Math.floor((ty - kbTop) / cellH);
+      const col = Math.floor((tx - kbStartX) / cellW);
+
+      if (row >= 0 && row <= 3) {
+        if (row < 3) {
+          // Letter row
+          const idx = row * HS_COLS + col;
+          if (idx < 27 && col < HS_COLS) {
+            const ch = getKBChar(row, col);
+            if (ch && nameEntry.name.length < 15) {
+              nameEntry.name += ch;
+            }
+          }
+        } else {
+          // Bottom row: DEL (left half) or END (right half)
+          if (col < 4) {
+            nameEntry.name = nameEntry.name.slice(0, -1);
+          } else {
+            // END — same logic as keyboard S on END
+            if (insertHighScore(nameEntry.name, score)) {
+              nameEntry.done = true;
+              nameEntry.saveMsg = 'SAVED!';
+              setTimeout(returnToIntro, 2000);
+            } else {
+              nameEntry.name = '';
+              nameEntry.saveMsg = '';
+              nameEntry.rejected = true;
+              setTimeout(function(){ nameEntry.rejected = false; }, 2500);
+            }
+          }
+        }
+      }
+    }
+    return;
+  }
+
   if(!gameRunning&&!coinInserted){
     coinInserted=true;
     document.getElementById('coinPrompt').style.display='none';
@@ -878,6 +1000,7 @@ canvas.addEventListener('touchstart',e=>{
     return;
   }
   if(!gameRunning&&coinInserted&&!gameOver){ startGame(); return; }
+  if(gameOver&&!nameEntry){ returnToIntro(); return; }
   if(mode==='main') shoot();
 });
 
@@ -1797,7 +1920,8 @@ function renderNameEntry() {
   // Instructions
   ctx.fillStyle = '#445'; ctx.font = Math.floor(11*S)+'px Orbitron,monospace';
   ctx.textAlign = 'center';
-  ctx.fillText('ARROWS to move · S to select', W/2, H*0.96);
+  const isTouch2 = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+  ctx.fillText(isTouch2 ? 'TAP letters · TAP DONE to save' : 'ARROWS to move \u00b7 S to select', W/2, H*0.96);
 }
 
 function renderScrollingScores() {
