@@ -1839,41 +1839,53 @@ function renderNameEntry() {
 function renderScrollingScores() {
   const lines = [];
 
-  // Online Players Leaderboard
-  if (jsonbinLoaded && onlineScores.allTimeScores.length > 0) {
-    lines.push({ type: 'header', text: '═══ ONLINE PLAYERS - POINTS ═══' });
-    for (let i = 0; i < Math.min(10, onlineScores.allTimeScores.length); i++) {
-      const s = onlineScores.allTimeScores[i];
-      lines.push({ type: 'score', rank: i+1, name: s.name, score: s.score });
+  // ONLINE section
+  if (jsonbinLoaded) {
+    lines.push({ type: 'maintitle', text: '═══════ ONLINE ═══════' });
+
+    // Points subsection
+    if (onlineScores.allTimeScores.length > 0) {
+      lines.push({ type: 'subtitle', text: '── POINTS ──' });
+      for (let i = 0; i < Math.min(5, onlineScores.allTimeScores.length); i++) {
+        const s = onlineScores.allTimeScores[i];
+        lines.push({ type: 'score', rank: i+1, name: s.name, score: s.score });
+      }
     }
+
+    // Height subsection
+    if (onlineScores.allTimeHeights.length > 0) {
+      lines.push({ type: 'subtitle', text: '── HEIGHT ──' });
+      for (let i = 0; i < Math.min(5, onlineScores.allTimeHeights.length); i++) {
+        const s = onlineScores.allTimeHeights[i];
+        lines.push({ type: 'score', rank: i+1, name: s.name, score: s.height });
+      }
+    }
+
     lines.push({ type: 'spacer' });
   }
 
-  if (jsonbinLoaded && onlineScores.allTimeHeights.length > 0) {
-    lines.push({ type: 'header', text: '═══ ONLINE PLAYERS - HEIGHT ═══' });
-    for (let i = 0; i < Math.min(10, onlineScores.allTimeHeights.length); i++) {
-      const s = onlineScores.allTimeHeights[i];
-      lines.push({ type: 'score', rank: i+1, name: s.name, score: s.height });
-    }
-    lines.push({ type: 'spacer' });
-  }
+  // ARCADE section
+  if (jsonbinLoaded) {
+    lines.push({ type: 'maintitle', text: '═══════ ARCADE ═══════' });
 
-  // Arcade Players Leaderboard
-  if (jsonbinLoaded && arcadeScores.allTimeScores.length > 0) {
-    lines.push({ type: 'header', text: '═══ ARCADE PLAYERS - POINTS ═══' });
-    for (let i = 0; i < Math.min(10, arcadeScores.allTimeScores.length); i++) {
-      const s = arcadeScores.allTimeScores[i];
-      lines.push({ type: 'score', rank: i+1, name: s.name, score: s.score });
+    // Points subsection
+    if (arcadeScores.allTimeScores.length > 0) {
+      lines.push({ type: 'subtitle', text: '── POINTS ──' });
+      for (let i = 0; i < Math.min(5, arcadeScores.allTimeScores.length); i++) {
+        const s = arcadeScores.allTimeScores[i];
+        lines.push({ type: 'score', rank: i+1, name: s.name, score: s.score });
+      }
     }
-    lines.push({ type: 'spacer' });
-  }
 
-  if (jsonbinLoaded && arcadeScores.allTimeHeights.length > 0) {
-    lines.push({ type: 'header', text: '═══ ARCADE PLAYERS - HEIGHT ═══' });
-    for (let i = 0; i < Math.min(10, arcadeScores.allTimeHeights.length); i++) {
-      const s = arcadeScores.allTimeHeights[i];
-      lines.push({ type: 'score', rank: i+1, name: s.name, score: s.height });
+    // Height subsection
+    if (arcadeScores.allTimeHeights.length > 0) {
+      lines.push({ type: 'subtitle', text: '── HEIGHT ──' });
+      for (let i = 0; i < Math.min(5, arcadeScores.allTimeHeights.length); i++) {
+        const s = arcadeScores.allTimeHeights[i];
+        lines.push({ type: 'score', rank: i+1, name: s.name, score: s.height });
+      }
     }
+
     lines.push({ type: 'spacer' });
   }
 
@@ -1898,7 +1910,13 @@ function renderScrollingScores() {
     const ly = scrollY + i * lineH;
     if (ly < startY - lineH || ly > startY + visibleH + lineH) continue;
     const line = lines[i];
-    if (line.type === 'header') {
+    if (line.type === 'maintitle') {
+      ctx.fillStyle = C.neonPink; ctx.font = 'bold '+Math.floor(24*S)+'px Orbitron,monospace';
+      ctx.fillText(line.text, W/2, ly);
+    } else if (line.type === 'subtitle') {
+      ctx.fillStyle = C.neonCyan; ctx.font = 'bold '+Math.floor(16*S)+'px Orbitron,monospace';
+      ctx.fillText(line.text, W/2, ly);
+    } else if (line.type === 'header') {
       ctx.fillStyle = C.neonPink; ctx.font = 'bold '+headerSize+'px Orbitron,monospace';
       ctx.fillText(line.text, W/2, ly);
     } else if (line.type === 'score') {
