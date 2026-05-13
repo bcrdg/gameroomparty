@@ -45,6 +45,21 @@
     font-size: 2.5vw; color: #0ff; margin-bottom: 5vh;
     letter-spacing: 0.8vw; text-transform: uppercase;
   }
+  #promoBar {
+    position: absolute; bottom: 2vh; left: 50%; transform: translateX(-50%);
+    display: flex; align-items: center; gap: 2vw;
+    background: rgba(255,45,149,0.15); border: 2px solid #ff2d95;
+    padding: 1.5vh 3vw; border-radius: 10px;
+    backdrop-filter: blur(10px);
+  }
+  #promoBar .promo-text {
+    font-size: 2vw; color: #fcee09; letter-spacing: 0.15vw;
+    text-shadow: 0 0 10px #fcee09; font-weight: 700;
+  }
+  #promoBar .qr-code {
+    width: 10vh; height: 10vh; background: white; padding: 0.5vh;
+    border-radius: 5px; box-shadow: 0 0 20px rgba(255,45,149,0.5);
+  }
   #gameOverScreen h2 {
     font-size: 7vw; font-weight: 900;
     background: linear-gradient(180deg, #ff2d95, #ff6ec7);
@@ -91,6 +106,10 @@
     <div class="subtitle">reach the neon sky</div>
     <div id="coinPrompt" class="blink-text" onclick="insertCoin()" style="font-size:4vw;color:#fcee09;letter-spacing:0.5vw;text-transform:uppercase;margin-bottom:2vh;text-shadow:0 0 10px #fcee09;cursor:pointer;padding:3vh 4vw;">INSERT COIN [C]</div>
     <div id="startPrompt" class="blink-text" onclick="startGame()" style="font-size:4vw;color:#0ff;letter-spacing:0.5vw;text-transform:uppercase;display:none;text-shadow:0 0 10px #0ff;cursor:pointer;padding:3vh 4vw;">PRESS START [S]</div>
+    <div id="promoBar">
+      <div class="promo-text">PLAY ONLINE FOR FREE AT<br>WWW.SONORAGAMEROOM.COM/PARTY</div>
+      <img class="qr-code" src="https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=https://www.sonoragameroom.com/party" alt="QR Code">
+    </div>
   </div>
   <div id="gameOverScreen" style="display:none" onclick="if(!nameEntry)returnToIntro()">
     <h2>game over</h2>
