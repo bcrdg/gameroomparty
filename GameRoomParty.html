@@ -150,6 +150,19 @@ const C = {
 };
 
 // ═══════════════════════════════════════
+// JSONBIN CONFIG
+// ═══════════════════════════════════════
+const JSONBIN_BIN_ID = '69be3149aa77b81da9048911';
+const JSONBIN_KEY = '$2a$10$5GQs.dV9WAlhCeEXVO9u2.EhBnHHEsYzb904C0yg4zhyad2.Y9bHm';
+const JSONBIN_URL = `https://api.jsonbin.io/v3/b/${JSONBIN_BIN_ID}`;
+
+// Game mode: 'arcade' or 'online'
+// Set to 'arcade' for arcade cabinet version (joystick/buttons)
+// Set to 'online' for web version (keyboard/touch)
+// This determines which JSONBin leaderboard scores are saved to
+let gameMode = 'arcade'; // Default to arcade
+
+// ═══════════════════════════════════════
 // AUDIO MANAGER
 // ═══════════════════════════════════════
 const audio = {
@@ -401,11 +414,18 @@ let dropItems = []; // falling items
 // ═══════════════════════════════════════
 // HIGH SCORE SYSTEM
 // ═══════════════════════════════════════
+// Local scores (current game mode)
 let allTimeScores = []; // [{name,score,date}] - points leaderboard
 let weeklyScores = [];
 let allTimeHeights = []; // [{name,height,date}] - height leaderboard
 let weeklyHeights = [];
+
+// Online scores from JSONBin
+let onlineScores = { allTimeScores: [], allTimeHeights: [], weeklyScores: [], weeklyHeights: [] };
+let arcadeScores = { allTimeScores: [], allTimeHeights: [], weeklyScores: [], weeklyHeights: [] };
+
 let hsLoaded = false;
+let jsonbinLoaded = false;
 let nameEntry = null; // null or {name:'',cursor:{row,col},done:false,type:'points'|'height'|'both'}
 let hsScrollOffset = 0;
 const HS_KEYBOARD = [
@@ -416,7 +436,83 @@ const HS_KEYBOARD = [
 ];
 const HS_COLS = 9;
 
+// ═══════════════════════════════════════
+// JSONBIN FUNCTIONS
+// ═══════════════════════════════════════
+async function fetchJSONBinScores() {
+  try {
+    const response = await fetch(JSONBIN_URL + '/latest', {
+      headers: {
+        'X-Master-Key': JSONBIN_KEY
+      }
+    });
+    if (response.ok) {
+      const data = await response.json();
+      const scores = data.record;
+
+      // Load online scores
+      if (scores.online) {
+        onlineScores.allTimeScores = scores.online.allTimeScores || [];
+        onlineScores.allTimeHeights = scores.online.allTimeHeights || [];
+        onlineScores.weeklyScores = scores.online.weeklyScores || [];
+        onlineScores.weeklyHeights = scores.online.weeklyHeights || [];
+      }
+
+      // Load arcade scores
+      if (scores.arcade) {
+        arcadeScores.allTimeScores = scores.arcade.allTimeScores || [];
+        arcadeScores.allTimeHeights = scores.arcade.allTimeHeights || [];
+        arcadeScores.weeklyScores = scores.arcade.weeklyScores || [];
+        arcadeScores.weeklyHeights = scores.arcade.weeklyHeights || [];
+      }
+
+      jsonbinLoaded = true;
+      console.log('JSONBin scores loaded successfully');
+    }
+  } catch (error) {
+    console.warn('Failed to load JSONBin scores:', error);
+    jsonbinLoaded = false;
+  }
+}
+
+async function updateJSONBinScores() {
+  try {
+    const payload = {
+      online: {
+        allTimeScores: onlineScores.allTimeScores,
+        allTimeHeights: onlineScores.allTimeHeights,
+        weeklyScores: onlineScores.weeklyScores,
+        weeklyHeights: onlineScores.weeklyHeights
+      },
+      arcade: {
+        allTimeScores: arcadeScores.allTimeScores,
+        allTimeHeights: arcadeScores.allTimeHeights,
+        weeklyScores: arcadeScores.weeklyScores,
+        weeklyHeights: arcadeScores.weeklyHeights
+      }
+    };
+
+    const response = await fetch(JSONBIN_URL, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Master-Key': JSONBIN_KEY
+      },
+      body: JSON.stringify(payload)
+    });
+
+    if (response.ok) {
+      console.log('JSONBin scores updated successfully');
+      return true;
+    }
+  } catch (error) {
+    console.warn('Failed to update JSONBin scores:', error);
+  }
+  return false;
+}
+
 function loadHighScores() {
+  // Load local localStorage scores for current mode
   try {
     const at = localStorage.getItem('grp-hs-alltime');
     allTimeScores = at ? JSON.parse(at) : [];
@@ -455,6 +551,9 @@ function loadHighScores() {
     } else { weeklyHeights = []; }
   } catch(e) { weeklyHeights = []; }
   hsLoaded = true;
+
+  // Load JSONBin scores asynchronously
+  fetchJSONBinScores();
 }
 
 function saveHighScores() {
@@ -494,29 +593,50 @@ function insertHighScore(name, s, h) {
   const cleaned = (name.trim() || 'AAA');
   if (isNameBlocked(cleaned)) return false; // blocked
 
+  const now = Date.now();
+  const targetScores = gameMode === 'online' ? onlineScores : arcadeScores;
+
   // Insert points score if qualified
   if (qualifiesForHighScore(s)) {
-    const entry = { name: cleaned, score: s, date: Date.now() };
+    const entry = { name: cleaned, score: s, date: now };
     allTimeScores.push(entry);
     allTimeScores.sort((a,b) => b.score - a.score);
     allTimeScores = allTimeScores.slice(0, 20);
     weeklyScores.push(entry);
     weeklyScores.sort((a,b) => b.score - a.score);
     weeklyScores = weeklyScores.slice(0, 20);
+
+    // Also update JSONBin data
+    targetScores.allTimeScores.push(entry);
+    targetScores.allTimeScores.sort((a,b) => b.score - a.score);
+    targetScores.allTimeScores = targetScores.allTimeScores.slice(0, 20);
+    targetScores.weeklyScores.push(entry);
+    targetScores.weeklyScores.sort((a,b) => b.score - a.score);
+    targetScores.weeklyScores = targetScores.weeklyScores.slice(0, 20);
   }
 
   // Insert height score if qualified
   if (qualifiesForHighHeight(h)) {
-    const entry = { name: cleaned, height: h, date: Date.now() };
+    const entry = { name: cleaned, height: h, date: now };
     allTimeHeights.push(entry);
     allTimeHeights.sort((a,b) => b.height - a.height);
     allTimeHeights = allTimeHeights.slice(0, 20);
     weeklyHeights.push(entry);
     weeklyHeights.sort((a,b) => b.height - a.height);
     weeklyHeights = weeklyHeights.slice(0, 20);
+
+    // Also update JSONBin data
+    targetScores.allTimeHeights.push(entry);
+    targetScores.allTimeHeights.sort((a,b) => b.height - a.height);
+    targetScores.allTimeHeights = targetScores.allTimeHeights.slice(0, 20);
+    targetScores.weeklyHeights.push(entry);
+    targetScores.weeklyHeights.sort((a,b) => b.height - a.height);
+    targetScores.weeklyHeights = targetScores.weeklyHeights.slice(0, 20);
   }
 
   saveHighScores();
+  // Update JSONBin asynchronously
+  updateJSONBinScores();
   return true; // saved
 }
 
@@ -1643,34 +1763,40 @@ function renderNameEntry() {
 
 function renderScrollingScores() {
   const lines = [];
-  if (allTimeScores.length > 0) {
-    lines.push({ type: 'header', text: '── ALL TIME HIGH POINTS ──' });
-    for (let i = 0; i < allTimeScores.length; i++) {
-      const s = allTimeScores[i];
+
+  // Online Players Leaderboard
+  if (jsonbinLoaded && onlineScores.allTimeScores.length > 0) {
+    lines.push({ type: 'header', text: '═══ ONLINE PLAYERS - POINTS ═══' });
+    for (let i = 0; i < Math.min(10, onlineScores.allTimeScores.length); i++) {
+      const s = onlineScores.allTimeScores[i];
       lines.push({ type: 'score', rank: i+1, name: s.name, score: s.score });
     }
     lines.push({ type: 'spacer' });
   }
-  if (allTimeHeights.length > 0) {
-    lines.push({ type: 'header', text: '── ALL TIME HIGH HEIGHT ──' });
-    for (let i = 0; i < allTimeHeights.length; i++) {
-      const s = allTimeHeights[i];
+
+  if (jsonbinLoaded && onlineScores.allTimeHeights.length > 0) {
+    lines.push({ type: 'header', text: '═══ ONLINE PLAYERS - HEIGHT ═══' });
+    for (let i = 0; i < Math.min(10, onlineScores.allTimeHeights.length); i++) {
+      const s = onlineScores.allTimeHeights[i];
       lines.push({ type: 'score', rank: i+1, name: s.name, score: s.height });
     }
     lines.push({ type: 'spacer' });
   }
-  if (weeklyScores.length > 0) {
-    lines.push({ type: 'header', text: '── THIS WEEK POINTS ──' });
-    for (let i = 0; i < weeklyScores.length; i++) {
-      const s = weeklyScores[i];
+
+  // Arcade Players Leaderboard
+  if (jsonbinLoaded && arcadeScores.allTimeScores.length > 0) {
+    lines.push({ type: 'header', text: '═══ ARCADE PLAYERS - POINTS ═══' });
+    for (let i = 0; i < Math.min(10, arcadeScores.allTimeScores.length); i++) {
+      const s = arcadeScores.allTimeScores[i];
       lines.push({ type: 'score', rank: i+1, name: s.name, score: s.score });
     }
     lines.push({ type: 'spacer' });
   }
-  if (weeklyHeights.length > 0) {
-    lines.push({ type: 'header', text: '── THIS WEEK HEIGHT ──' });
-    for (let i = 0; i < weeklyHeights.length; i++) {
-      const s = weeklyHeights[i];
+
+  if (jsonbinLoaded && arcadeScores.allTimeHeights.length > 0) {
+    lines.push({ type: 'header', text: '═══ ARCADE PLAYERS - HEIGHT ═══' });
+    for (let i = 0; i < Math.min(10, arcadeScores.allTimeHeights.length); i++) {
+      const s = arcadeScores.allTimeHeights[i];
       lines.push({ type: 'score', rank: i+1, name: s.name, score: s.height });
     }
     lines.push({ type: 'spacer' });
