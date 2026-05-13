@@ -459,6 +459,33 @@ const HS_COLS = 9;
 // ═══════════════════════════════════════
 // JSONBIN FUNCTIONS
 // ═══════════════════════════════════════
+function getCurrentWeekKey() {
+  const now = new Date();
+  const weekStart = new Date(now);
+  weekStart.setDate(now.getDate() - now.getDay());
+  return weekStart.toISOString().slice(0, 10);
+}
+
+function isScoreFromThisWeek(timestamp) {
+  const scoreDate = new Date(timestamp);
+  const now = new Date();
+  const weekStart = new Date(now);
+  weekStart.setDate(now.getDate() - now.getDay());
+  weekStart.setHours(0, 0, 0, 0);
+  return scoreDate >= weekStart;
+}
+
+function cleanWeeklyScores(scores) {
+  // Remove scores not from this week
+  if (scores.weeklyScores) {
+    scores.weeklyScores = scores.weeklyScores.filter(s => isScoreFromThisWeek(s.date));
+  }
+  if (scores.weeklyHeights) {
+    scores.weeklyHeights = scores.weeklyHeights.filter(s => isScoreFromThisWeek(s.date));
+  }
+  return scores;
+}
+
 async function fetchJSONBinScores() {
   try {
     console.log('Fetching JSONBin scores...');
@@ -473,7 +500,7 @@ async function fetchJSONBinScores() {
     if (response.ok) {
       const data = await response.json();
       console.log('JSONBin data received:', data);
-      const scores = data.record;
+      let scores = data.record;
 
       // If bin is empty or malformed, initialize it
       if (!scores || (!scores.online && !scores.arcade)) {
@@ -482,20 +509,36 @@ async function fetchJSONBinScores() {
         return;
       }
 
-      // Load online scores
+      // Load online scores and clean weekly
       if (scores.online) {
+        scores.online = cleanWeeklyScores(scores.online);
         onlineScores.allTimeScores = scores.online.allTimeScores || [];
         onlineScores.allTimeHeights = scores.online.allTimeHeights || [];
         onlineScores.weeklyScores = scores.online.weeklyScores || [];
         onlineScores.weeklyHeights = scores.online.weeklyHeights || [];
       }
 
-      // Load arcade scores
+      // Load arcade scores and clean weekly
       if (scores.arcade) {
+        scores.arcade = cleanWeeklyScores(scores.arcade);
         arcadeScores.allTimeScores = scores.arcade.allTimeScores || [];
         arcadeScores.allTimeHeights = scores.arcade.allTimeHeights || [];
         arcadeScores.weeklyScores = scores.arcade.weeklyScores || [];
         arcadeScores.weeklyHeights = scores.arcade.weeklyHeights || [];
+      }
+
+      // Update JSONBin with cleaned scores
+      const needsUpdate = (scores.online && (
+        scores.online.weeklyScores.length !== onlineScores.weeklyScores.length ||
+        scores.online.weeklyHeights.length !== onlineScores.weeklyHeights.length
+      )) || (scores.arcade && (
+        scores.arcade.weeklyScores.length !== arcadeScores.weeklyScores.length ||
+        scores.arcade.weeklyHeights.length !== arcadeScores.weeklyHeights.length
+      ));
+
+      if (needsUpdate) {
+        console.log('Cleaning up old weekly scores...');
+        await updateJSONBinScores();
       }
 
       jsonbinLoaded = true;
@@ -1843,20 +1886,36 @@ function renderScrollingScores() {
   if (jsonbinLoaded) {
     lines.push({ type: 'maintitle', text: '═══════ ONLINE ═══════' });
 
-    // Points subsection
+    // All-Time subsection
+    lines.push({ type: 'subtitle', text: '── ALL TIME ──' });
     if (onlineScores.allTimeScores.length > 0) {
-      lines.push({ type: 'subtitle', text: '── POINTS ──' });
-      for (let i = 0; i < Math.min(5, onlineScores.allTimeScores.length); i++) {
+      lines.push({ type: 'minilabel', text: 'Points' });
+      for (let i = 0; i < Math.min(3, onlineScores.allTimeScores.length); i++) {
         const s = onlineScores.allTimeScores[i];
         lines.push({ type: 'score', rank: i+1, name: s.name, score: s.score });
       }
     }
-
-    // Height subsection
     if (onlineScores.allTimeHeights.length > 0) {
-      lines.push({ type: 'subtitle', text: '── HEIGHT ──' });
-      for (let i = 0; i < Math.min(5, onlineScores.allTimeHeights.length); i++) {
+      lines.push({ type: 'minilabel', text: 'Height' });
+      for (let i = 0; i < Math.min(3, onlineScores.allTimeHeights.length); i++) {
         const s = onlineScores.allTimeHeights[i];
+        lines.push({ type: 'score', rank: i+1, name: s.name, score: s.height });
+      }
+    }
+
+    // Weekly subsection
+    lines.push({ type: 'subtitle', text: '── THIS WEEK ──' });
+    if (onlineScores.weeklyScores.length > 0) {
+      lines.push({ type: 'minilabel', text: 'Points' });
+      for (let i = 0; i < Math.min(3, onlineScores.weeklyScores.length); i++) {
+        const s = onlineScores.weeklyScores[i];
+        lines.push({ type: 'score', rank: i+1, name: s.name, score: s.score });
+      }
+    }
+    if (onlineScores.weeklyHeights.length > 0) {
+      lines.push({ type: 'minilabel', text: 'Height' });
+      for (let i = 0; i < Math.min(3, onlineScores.weeklyHeights.length); i++) {
+        const s = onlineScores.weeklyHeights[i];
         lines.push({ type: 'score', rank: i+1, name: s.name, score: s.height });
       }
     }
@@ -1868,20 +1927,36 @@ function renderScrollingScores() {
   if (jsonbinLoaded) {
     lines.push({ type: 'maintitle', text: '═══════ ARCADE ═══════' });
 
-    // Points subsection
+    // All-Time subsection
+    lines.push({ type: 'subtitle', text: '── ALL TIME ──' });
     if (arcadeScores.allTimeScores.length > 0) {
-      lines.push({ type: 'subtitle', text: '── POINTS ──' });
-      for (let i = 0; i < Math.min(5, arcadeScores.allTimeScores.length); i++) {
+      lines.push({ type: 'minilabel', text: 'Points' });
+      for (let i = 0; i < Math.min(3, arcadeScores.allTimeScores.length); i++) {
         const s = arcadeScores.allTimeScores[i];
         lines.push({ type: 'score', rank: i+1, name: s.name, score: s.score });
       }
     }
-
-    // Height subsection
     if (arcadeScores.allTimeHeights.length > 0) {
-      lines.push({ type: 'subtitle', text: '── HEIGHT ──' });
-      for (let i = 0; i < Math.min(5, arcadeScores.allTimeHeights.length); i++) {
+      lines.push({ type: 'minilabel', text: 'Height' });
+      for (let i = 0; i < Math.min(3, arcadeScores.allTimeHeights.length); i++) {
         const s = arcadeScores.allTimeHeights[i];
+        lines.push({ type: 'score', rank: i+1, name: s.name, score: s.height });
+      }
+    }
+
+    // Weekly subsection
+    lines.push({ type: 'subtitle', text: '── THIS WEEK ──' });
+    if (arcadeScores.weeklyScores.length > 0) {
+      lines.push({ type: 'minilabel', text: 'Points' });
+      for (let i = 0; i < Math.min(3, arcadeScores.weeklyScores.length); i++) {
+        const s = arcadeScores.weeklyScores[i];
+        lines.push({ type: 'score', rank: i+1, name: s.name, score: s.score });
+      }
+    }
+    if (arcadeScores.weeklyHeights.length > 0) {
+      lines.push({ type: 'minilabel', text: 'Height' });
+      for (let i = 0; i < Math.min(3, arcadeScores.weeklyHeights.length); i++) {
+        const s = arcadeScores.weeklyHeights[i];
         lines.push({ type: 'score', rank: i+1, name: s.name, score: s.height });
       }
     }
@@ -1915,6 +1990,9 @@ function renderScrollingScores() {
       ctx.fillText(line.text, W/2, ly);
     } else if (line.type === 'subtitle') {
       ctx.fillStyle = C.neonCyan; ctx.font = 'bold '+Math.floor(16*S)+'px Orbitron,monospace';
+      ctx.fillText(line.text, W/2, ly);
+    } else if (line.type === 'minilabel') {
+      ctx.fillStyle = C.neonYellow; ctx.font = Math.floor(14*S)+'px Orbitron,monospace';
       ctx.fillText(line.text, W/2, ly);
     } else if (line.type === 'header') {
       ctx.fillStyle = C.neonPink; ctx.font = 'bold '+headerSize+'px Orbitron,monospace';
