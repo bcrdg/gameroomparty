@@ -442,14 +442,26 @@ const HS_COLS = 9;
 // ═══════════════════════════════════════
 async function fetchJSONBinScores() {
   try {
+    console.log('Fetching JSONBin scores...');
     const response = await fetch(JSONBIN_URL + '/latest', {
       headers: {
         'X-Master-Key': JSONBIN_KEY
       }
     });
+
+    console.log('JSONBin response status:', response.status);
+
     if (response.ok) {
       const data = await response.json();
+      console.log('JSONBin data received:', data);
       const scores = data.record;
+
+      // If bin is empty or malformed, initialize it
+      if (!scores || (!scores.online && !scores.arcade)) {
+        console.log('Initializing empty JSONBin structure...');
+        await initializeJSONBin();
+        return;
+      }
 
       // Load online scores
       if (scores.online) {
@@ -468,11 +480,54 @@ async function fetchJSONBinScores() {
       }
 
       jsonbinLoaded = true;
-      console.log('JSONBin scores loaded successfully');
+      console.log('JSONBin scores loaded successfully!');
+      console.log('Online scores:', onlineScores.allTimeScores.length);
+      console.log('Arcade scores:', arcadeScores.allTimeScores.length);
+    } else {
+      console.error('JSONBin fetch failed with status:', response.status);
+      const errorText = await response.text();
+      console.error('Error response:', errorText);
     }
   } catch (error) {
-    console.warn('Failed to load JSONBin scores:', error);
+    console.error('Failed to load JSONBin scores:', error);
     jsonbinLoaded = false;
+  }
+}
+
+async function initializeJSONBin() {
+  const emptyStructure = {
+    online: {
+      allTimeScores: [],
+      allTimeHeights: [],
+      weeklyScores: [],
+      weeklyHeights: []
+    },
+    arcade: {
+      allTimeScores: [],
+      allTimeHeights: [],
+      weeklyScores: [],
+      weeklyHeights: []
+    }
+  };
+
+  try {
+    const response = await fetch(JSONBIN_URL, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Master-Key': JSONBIN_KEY
+      },
+      body: JSON.stringify(emptyStructure)
+    });
+
+    if (response.ok) {
+      console.log('JSONBin initialized with empty structure');
+      onlineScores = emptyStructure.online;
+      arcadeScores = emptyStructure.arcade;
+      jsonbinLoaded = true;
+    }
+  } catch (error) {
+    console.error('Failed to initialize JSONBin:', error);
   }
 }
 
