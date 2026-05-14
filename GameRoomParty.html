@@ -94,8 +94,9 @@
     transform: translate(-50%, -50%);
     width: 90%;
     max-width: 800px;
-    height: 80px;
-    padding: 15px;
+    min-height: 80px;
+    padding: 20px;
+    margin: 0;
     font-family: 'Orbitron', monospace;
     font-size: 32px;
     font-weight: bold;
@@ -109,10 +110,14 @@
     display: none;
     z-index: 10000;
     box-shadow: 0 0 40px rgba(0, 255, 255, 0.8), inset 0 0 20px rgba(0, 255, 255, 0.1);
-    touch-action: manipulation;
+    -webkit-appearance: none;
+    -webkit-user-select: text;
+    user-select: text;
+    pointer-events: auto;
   }
   #nameInput::placeholder {
     color: rgba(0, 255, 255, 0.6);
+    font-size: 24px;
   }
   .btn {
     padding: 14px 52px; font-family: 'Orbitron', monospace;
@@ -864,6 +869,8 @@ function startNameEntry() {
       const newInput = document.getElementById('nameInput');
       newInput.style.display = 'block';
       newInput.value = '';
+      newInput.readOnly = false;
+      newInput.disabled = false;
 
       newInput.addEventListener('input', function(e) {
         nameEntry.name = e.target.value.toUpperCase().slice(0, 15);
@@ -889,11 +896,8 @@ function startNameEntry() {
         }
       });
 
-      // Mobile requires user gesture - input handles its own taps
-      // Multiple attempts to focus for iOS compatibility
-      setTimeout(() => newInput.focus(), 50);
-      setTimeout(() => newInput.focus(), 200);
-      setTimeout(() => newInput.focus(), 400);
+      // iOS requires user to tap input directly - no programmatic focus
+      // Just make it visible and tappable
     }
   }
 }
@@ -1978,14 +1982,18 @@ function renderNameEntry() {
       ctx.fillText('Points: ' + score.toLocaleString(), W/2, H*0.18);
     }
 
-    // Name display (synced with HTML input)
-    if (ne.name.length > 0) {
-      ctx.fillStyle = '#fff'; ctx.font = 'bold '+Math.floor(42*S)+'px Orbitron,monospace';
-      ctx.fillText(ne.name, W/2, H*0.35);
-    }
+    // Instruction text
+    ctx.fillStyle = C.neonCyan; ctx.font = 'bold '+Math.floor(24*S)+'px Orbitron,monospace';
+    ctx.fillText('TAP THE BLUE BOX TO TYPE', W/2, H*0.35);
 
-    ctx.fillStyle = '#888'; ctx.font = Math.floor(16*S)+'px Orbitron,monospace';
-    ctx.fillText(ne.name.length + '/15', W/2, H*0.70);
+    ctx.fillStyle = '#888'; ctx.font = Math.floor(18*S)+'px Orbitron,monospace';
+    ctx.fillText('(Your name will appear as you type)', W/2, H*0.40);
+
+    // Show character count
+    if (ne.name.length > 0) {
+      ctx.fillStyle = '#aaa'; ctx.font = Math.floor(16*S)+'px Orbitron,monospace';
+      ctx.fillText(ne.name.length + '/15 characters', W/2, H*0.70);
+    }
 
     if (ne.done) {
       ctx.fillStyle = C.neonCyan; ctx.font = 'bold '+Math.floor(24*S)+'px Orbitron,monospace';
