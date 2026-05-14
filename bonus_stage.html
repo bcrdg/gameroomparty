@@ -195,8 +195,11 @@ function drawBridgeAndCliffs() {
     var z=(i/B_SEGS)*B_DEPTH; var p=proj(z,-1);
     if(i===0) ctx.moveTo(p.x,p.y); else ctx.lineTo(p.x,p.y);
   }
-  ctx.lineTo(0, H*B_HORIZON); ctx.lineTo(0, H);
-  var bp=proj(0,-1); ctx.lineTo(bp.x, H); ctx.closePath();
+  var nearLeft=proj(0,-1);
+  ctx.lineTo(nearLeft.x, H);
+  ctx.lineTo(0, H);
+  ctx.lineTo(0, H*B_HORIZON);
+  ctx.closePath();
   ctx.fillStyle='rgba(2,0,8,0.55)'; ctx.fill();
 
   // Right void
@@ -205,8 +208,11 @@ function drawBridgeAndCliffs() {
     var z=(i/B_SEGS)*B_DEPTH; var p=proj(z,1);
     if(i===0) ctx.moveTo(p.x,p.y); else ctx.lineTo(p.x,p.y);
   }
-  ctx.lineTo(W, H*B_HORIZON); ctx.lineTo(W, H);
-  var bp2=proj(0,1); ctx.lineTo(bp2.x, H); ctx.closePath();
+  var nearRight=proj(0,1);
+  ctx.lineTo(nearRight.x, H);
+  ctx.lineTo(W, H);
+  ctx.lineTo(W, H*B_HORIZON);
+  ctx.closePath();
   ctx.fillStyle='rgba(2,0,8,0.55)'; ctx.fill();
 
   // Bridge planks
@@ -328,7 +334,7 @@ function initBonus() {
   bon = {
     pl:0, tl:0, speed:0, distance:0, leg:0,
     timer:30*60, quarters:[], bombs:[], parts:[],
-    combo:0, ct:0, hf:0, bs:0, flash:60
+    combo:0, ct:0, hf:0, bs:0, flash:60, bombHits:0
   };
   for(var i=0;i<30;i++){
     var lane=(Math.floor(Math.random()*B_LANES)-Math.floor(B_LANES/2))/(B_LANES/2);
@@ -398,8 +404,16 @@ function update() {
       if(Math.abs(bm.lane-b.pl)<0.22&&bm.z<3&&bm.z>-0.5){
         bm.hit=true;b.hf=30;b.speed*=0.3;b.combo=0;
         b.bs=Math.max(0,b.bs-31);
+        b.bombHits++;
         var p=proj(Math.max(0.1,bm.z),bm.lane);
         bonParts(p.x,p.y,NP,12);
+        // Three bomb hits = explosion, game over
+        if(b.bombHits>=3){
+          bonParts(p.x,p.y,'#ff6600',30);
+          bonParts(p.x,p.y,'#ffff00',20);
+          endGame();
+          return;
+        }
       }
     }
   }
