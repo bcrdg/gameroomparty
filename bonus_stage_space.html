@@ -291,7 +291,9 @@ function update() {
           score += 1000;
           g.explosions.push({x:b.x, y:b.y, life:40});
           g.boss = null;
-          break; // Exit immediately after boss defeated
+          // End game after brief delay to show explosion
+          setTimeout(endGame, 1000);
+          return; // Exit update immediately
         }
         break;
       }
