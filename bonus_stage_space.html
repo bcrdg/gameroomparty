@@ -219,7 +219,7 @@ function update() {
 
   // Spawn enemies (3 types) - continues even during boss fight
   g.spawnCounter++;
-  var spawnRate = g.boss ? 50 : 25; // Spawn every 0.4-0.8 seconds
+  var spawnRate = g.boss ? 17 : 8; // Triple enemy count - spawn every ~0.13-0.28 seconds
   if(g.spawnCounter > spawnRate) {
     g.spawnCounter = 0;
     var ex = 50*S + Math.random()*(W-100*S);
