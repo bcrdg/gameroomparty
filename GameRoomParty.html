@@ -1543,8 +1543,14 @@ function updateMain() {
       spawnParticles(c.x, c.y - camera, C.gold, 10);
       if (coinCount >= 3) {
         coinCount = 0;
-        startBonusTransition();
-        return;
+        if (gameMode === 'arcade') {
+          startBonusTransition();
+          return;
+        } else {
+          // Online mode: coins give 50k points instead of bonus
+          score += 50000;
+          scorePopups.push({x: c.x, y: c.y - camera, text: '+50K', color: C.gold, life: 60});
+        }
       }
     }
   }
@@ -1908,7 +1914,11 @@ function renderMain() {
   const qx = W - 14*S;
   ctx.font='bold '+Math.floor(14*S)+'px Orbitron,monospace'; ctx.textAlign='right';
   ctx.fillStyle=C.gold;
-  ctx.fillText(coinCount + '/3', qx - 22*S, 24*S);
+  if (gameMode === 'arcade') {
+    ctx.fillText(coinCount + '/3', qx - 22*S, 24*S);
+  } else {
+    ctx.fillText(coinCount + '/3 = 50K', qx - 22*S, 24*S);
+  }
   drawCoin(qx - 6*S, 19*S, 8*S);
 
   // HUD - Lives (hearts below coins)
