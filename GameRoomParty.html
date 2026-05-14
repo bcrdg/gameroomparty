@@ -151,7 +151,7 @@
   <div id="startScreen">
     <h1>Game Room Party</h1>
     <div class="subtitle">reach the neon sky</div>
-    <div id="versionInfo" style="font-size:2vw;color:#aaa;margin-top:1vh;font-family:monospace;letter-spacing:0.1em;text-shadow:0 0 5px rgba(255,255,255,0.3);"></div>
+    <div id="versionInfo" style="font-size:3vw;color:#00ffff;margin-top:2vh;font-family:monospace;letter-spacing:0.1em;text-shadow:0 0 10px #00ffff;background:rgba(0,0,0,0.5);padding:1vh 2vw;border-radius:5px;"></div>
     <!-- Arcade Mode Prompts -->
     <div id="coinPrompt" class="blink-text" onclick="insertCoin()" style="font-size:4vw;color:#fcee09;letter-spacing:0.5vw;text-transform:uppercase;margin-bottom:2vh;text-shadow:0 0 10px #fcee09;cursor:pointer;padding:3vh 4vw;display:none;">INSERT COIN [C]</div>
     <div id="startPrompt" class="blink-text" onclick="startGame()" style="font-size:4vw;color:#0ff;letter-spacing:0.5vw;text-transform:uppercase;display:none;text-shadow:0 0 10px #0ff;cursor:pointer;padding:3vh 4vw;">PRESS START [S]</div>
@@ -2278,9 +2278,14 @@ if (gameMode === 'online') {
 
 // Display version info
 const versionInfo = document.getElementById('versionInfo');
+console.log('Version display: element found?', !!versionInfo, 'gameMode:', gameMode);
 if (versionInfo) {
   const modeVersion = gameMode === 'online' ? `O-${VERSION_ONLINE}` : `A-${VERSION_ARCADE}`;
-  versionInfo.textContent = `${modeVersion} | B-${VERSION_BASE}`;
+  const versionText = `${modeVersion} | B-${VERSION_BASE}`;
+  versionInfo.textContent = versionText;
+  console.log('Version set to:', versionText);
+} else {
+  console.error('versionInfo element not found!');
 }
 
 loadHighScores();
