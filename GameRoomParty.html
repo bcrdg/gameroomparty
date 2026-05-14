@@ -49,8 +49,9 @@
     position: absolute; bottom: 2vh; left: 50%; transform: translateX(-50%);
     display: flex; align-items: center; gap: 2vw;
     background: rgba(255,45,149,0.15); border: 2px solid #ff2d95;
-    padding: 1.5vh 3vw; border-radius: 10px;
+    padding: 2vh 4vw; border-radius: 10px;
     backdrop-filter: blur(10px);
+    max-width: 90%;
   }
   #promoBar .promo-text {
     font-size: 1.8vw; color: #fcee09; letter-spacing: 0.12vw;
@@ -60,6 +61,16 @@
   #promoBar .qr-code {
     width: 10vh; height: 10vh; background: white; padding: 0.5vh;
     border-radius: 5px; box-shadow: 0 0 20px rgba(255,45,149,0.5);
+  }
+  @media (max-width: 768px) {
+    #promoBar {
+      padding: 3vh 5vw;
+      bottom: 1vh;
+    }
+    #promoBar .promo-text {
+      font-size: 3.5vw;
+      letter-spacing: 0.08vw;
+    }
   }
   #gameOverScreen h2 {
     font-size: 7vw; font-weight: 900;
@@ -2062,8 +2073,8 @@ function renderScrollingScores() {
   const fontSize = Math.floor(18 * S);
   const headerSize = Math.floor(20 * S);
   const totalH = lines.length * lineH;
-  const startY = H * 0.45;
-  const visibleH = H * 0.5;
+  const startY = H * 0.55;
+  const visibleH = H * 0.28;
 
   ctx.save();
   ctx.beginPath();
@@ -2131,9 +2142,8 @@ if (gameMode === 'online') {
 loadHighScores();
 gameLoop();
 
-// Rotate promo messages
-const promoMessages = gameMode === 'online' ? [
-  // Online version: all promotional messages
+// Rotate promo messages (same for both arcade and online)
+const promoMessages = [
   {
     text: 'THE GAME ROOM<br>14888 PEACEFUL VALLEY RD, SONORA, CA 95370<br>(209) 536-4390',
     showQR: false,
@@ -2173,18 +2183,6 @@ const promoMessages = gameMode === 'online' ? [
     text: "WE'RE ALWAYS DOING SOMETHING<br>CHECK OUT OUR CALENDAR FOR UPCOMING EVENTS<br>TAP TO VIEW",
     showQR: false,
     link: 'https://sonoragameroom.com/events/'
-  }
-] : [
-  // Arcade version: original messages with QR code
-  {
-    text: 'PLAY ONLINE FOR FREE AT<br>WWW.SONORAGAMEROOM.COM/PARTY',
-    showQR: true,
-    link: null
-  },
-  {
-    text: 'TAKE A SELFIE AT THE "ENTER NAME" SCREEN<br>WITH AN ARCADE HEIGHT SCORE OF 1 MILLION OR HIGHER<br>FOR A FREE SANDWICH!',
-    showQR: false,
-    link: null
   }
 ];
 
