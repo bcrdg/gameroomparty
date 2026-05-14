@@ -423,6 +423,20 @@ function update() {
   if(touchDir!==0) steer=touchDir;
   // Use tilt if available and significant
   if(Math.abs(tiltX) > 0.1) steer=tiltX;
+  // Gamepad support
+  var gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
+  for(var i=0; i<gamepads.length; i++) {
+    var gp = gamepads[i];
+    if(gp && gp.connected) {
+      // D-pad or left stick
+      if(gp.axes[0] < -0.3) steer=-1;
+      else if(gp.axes[0] > 0.3) steer=1;
+      // D-pad buttons (buttons 14=left, 15=right)
+      if(gp.buttons[14] && gp.buttons[14].pressed) steer=-1;
+      if(gp.buttons[15] && gp.buttons[15].pressed) steer=1;
+      break;
+    }
+  }
 
   b.tl+=steer*0.04;
   if(b.tl>0.85) b.tl=0.85;
