@@ -374,6 +374,34 @@ canvas.addEventListener('touchstart',function(e){
 canvas.addEventListener('touchmove',function(e){e.preventDefault();touchDir=e.touches[0].clientX<W/2?-1:1;});
 canvas.addEventListener('touchend',function(){touchDir=0;});
 
+// Tilt controls for mobile
+var tiltX = 0;
+function handleTilt(e) {
+  if (e.gamma !== null) {
+    // gamma is left/right tilt (-90 to 90)
+    tiltX = Math.max(-1, Math.min(1, e.gamma / 30));
+  }
+}
+
+function enableTilt() {
+  if (typeof DeviceOrientationEvent !== 'undefined' &&
+      typeof DeviceOrientationEvent.requestPermission === 'function') {
+    // iOS 13+ requires permission
+    DeviceOrientationEvent.requestPermission()
+      .then(function(permissionState) {
+        if (permissionState === 'granted') {
+          window.addEventListener('deviceorientation', handleTilt);
+        }
+      });
+  } else if (window.DeviceOrientationEvent) {
+    window.addEventListener('deviceorientation', handleTilt);
+  }
+}
+
+// Enable tilt on first user interaction
+document.addEventListener('touchstart', enableTilt, { once: true });
+document.addEventListener('click', enableTilt, { once: true });
+
 // ═══ UPDATE ═══
 function update() {
   if(state!=='playing'||!bon) return;
@@ -390,6 +418,8 @@ function update() {
   if(keys['ArrowLeft']||keys['a']||keys['A']) steer=-1;
   if(keys['ArrowRight']||keys['d']||keys['D']) steer=1;
   if(touchDir!==0) steer=touchDir;
+  // Use tilt if available and significant
+  if(Math.abs(tiltX) > 0.1) steer=tiltX;
 
   b.tl+=steer*0.04;
   if(b.tl>0.85) b.tl=0.85;
@@ -425,10 +455,11 @@ function update() {
         bonParts(p.x,p.y,NP,8); // Pink explosion
         // Three bomb hits = massive explosion, game over
         if(b.bombHits>=3){
-          bonParts(rp.x,rp.y-25*S,'#ff6600',40); // Orange explosion
-          bonParts(rp.x,rp.y-25*S,'#ffff00',30); // Yellow explosion
-          bonParts(rp.x,rp.y-25*S,'#22a844',25); // Robot debris
-          bonParts(rp.x,rp.y-25*S,'#3344dd',20); // More debris
+          var robotPos=proj(0.5,b.pl);
+          bonParts(robotPos.x,robotPos.y,'#ff6600',40); // Orange explosion
+          bonParts(robotPos.x,robotPos.y,'#ffff00',30); // Yellow explosion
+          bonParts(robotPos.x,robotPos.y,'#22a844',25); // Robot debris
+          bonParts(robotPos.x,robotPos.y,'#3344dd',20); // More debris
           endGame();
           return;
         }
