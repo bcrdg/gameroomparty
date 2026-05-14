@@ -1553,11 +1553,11 @@ function updateMain() {
     if (Math.abs(player.x - di.x) < 20*S && Math.abs((player.y - camera) - dsy) < 20*S) {
       di.collected = true;
       if (di.bad) {
-        score = Math.max(0, score - 15);
+        score = Math.max(0, score - 500);
         spawnParticles(di.x, dsy, C.neonPink, 5);
-        scorePopups.push({x:di.x, y:dsy, text:'-15', color:C.neonPink, life:45});
+        scorePopups.push({x:di.x, y:dsy, text:'-500', color:C.neonPink, life:45});
       } else {
-        const pts = di.type === 'quarters' ? 25 : 10;
+        const pts = 1500; // All good items worth 1500
         score += pts;
         spawnParticles(di.x, dsy, di.type === 'quarters' ? C.gold : C.neonYellow, 5);
         scorePopups.push({x:di.x, y:dsy, text:'+'+pts, color:di.type==='quarters'?C.gold:C.neonYellow, life:45});
