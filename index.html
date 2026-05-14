@@ -1280,8 +1280,23 @@ document.addEventListener('keydown',e=>{
     // Arcade mode: use on-screen keyboard
     const c = nameEntry.cursor;
     const maxCol = c.row < 3 ? HS_COLS - 1 : 8;
-    if (e.key === 'ArrowLeft') { c.col--; if (c.col < 0) c.col = maxCol; }
-    else if (e.key === 'ArrowRight') { c.col++; if (c.col > maxCol) c.col = 0; }
+
+    if (e.key === 'ArrowLeft') {
+      if (c.row === 3) {
+        // On bottom row: jump between DEL and DONE
+        c.col = c.col >= 4 ? 1 : (c.col === 0 ? 6 : 0);
+      } else {
+        c.col--; if (c.col < 0) c.col = maxCol;
+      }
+    }
+    else if (e.key === 'ArrowRight') {
+      if (c.row === 3) {
+        // On bottom row: jump between DEL and DONE
+        c.col = c.col < 4 ? 6 : (c.col === 8 ? 1 : 8);
+      } else {
+        c.col++; if (c.col > maxCol) c.col = 0;
+      }
+    }
     else if (e.key === 'ArrowUp') { c.row--; if (c.row < 0) c.row = 3; if (c.row < 3 && c.col >= HS_COLS) c.col = HS_COLS - 1; }
     else if (e.key === 'ArrowDown') { c.row++; if (c.row > 3) c.row = 0; if (c.row < 3 && c.col >= HS_COLS) c.col = HS_COLS - 1; }
     else if (e.key === 's' || e.key === 'S') {
