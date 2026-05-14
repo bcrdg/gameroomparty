@@ -1330,6 +1330,33 @@ canvas.addEventListener('touchstart',e=>{
   if(mode==='main') shoot();
 });
 
+// ── XIN-MO DUAL ARCADE (HID GAMEPAD) ──
+// B0=Left, B1=Down, B2=Up, B3=Right, B4=Start. B7=Coin (active-low: held in normal state, releases on coin).
+const PAD_MAP = {0:'ArrowLeft', 1:'ArrowDown', 2:'ArrowUp', 3:'ArrowRight', 4:'s'};
+const PAD_COIN_BTN = 7;
+const padPrev = {};
+let padCoinPrev = false, padCoinArmed = false;
+function pollGamepad() {
+  const pads = navigator.getGamepads ? navigator.getGamepads() : [];
+  for (const pad of pads) {
+    if (!pad) continue;
+    for (const i in PAD_MAP) {
+      const key = PAD_MAP[i];
+      const cur = !!(pad.buttons[i] && pad.buttons[i].pressed);
+      if (cur && !padPrev[i]) document.dispatchEvent(new KeyboardEvent('keydown', {key}));
+      else if (!cur && padPrev[i]) document.dispatchEvent(new KeyboardEvent('keyup', {key}));
+      padPrev[i] = cur;
+    }
+    const coinCur = !!(pad.buttons[PAD_COIN_BTN] && pad.buttons[PAD_COIN_BTN].pressed);
+    if (coinCur) padCoinArmed = true;
+    if (padCoinArmed && padCoinPrev && !coinCur) document.dispatchEvent(new KeyboardEvent('keydown', {key:'c'}));
+    padCoinPrev = coinCur;
+    break;
+  }
+  requestAnimationFrame(pollGamepad);
+}
+requestAnimationFrame(pollGamepad);
+
 function shoot() {
   if(!gameRunning||gameOver) return;
   bullets.push({x:player.x+(player.facingRight?18*S:-18*S),y:player.y-20*S,vy:-BULLET_SPEED});
