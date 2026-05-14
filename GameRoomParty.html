@@ -104,8 +104,11 @@
   <div id="startScreen">
     <h1>Game Room Party</h1>
     <div class="subtitle">reach the neon sky</div>
-    <div id="coinPrompt" class="blink-text" onclick="insertCoin()" style="font-size:4vw;color:#fcee09;letter-spacing:0.5vw;text-transform:uppercase;margin-bottom:2vh;text-shadow:0 0 10px #fcee09;cursor:pointer;padding:3vh 4vw;">INSERT COIN [C]</div>
+    <!-- Arcade Mode Prompts -->
+    <div id="coinPrompt" class="blink-text" onclick="insertCoin()" style="font-size:4vw;color:#fcee09;letter-spacing:0.5vw;text-transform:uppercase;margin-bottom:2vh;text-shadow:0 0 10px #fcee09;cursor:pointer;padding:3vh 4vw;display:none;">INSERT COIN [C]</div>
     <div id="startPrompt" class="blink-text" onclick="startGame()" style="font-size:4vw;color:#0ff;letter-spacing:0.5vw;text-transform:uppercase;display:none;text-shadow:0 0 10px #0ff;cursor:pointer;padding:3vh 4vw;">PRESS START [S]</div>
+    <!-- Online Mode Prompt -->
+    <div id="tapPrompt" class="blink-text" onclick="startGame()" style="font-size:4vw;color:#0ff;letter-spacing:0.5vw;text-transform:uppercase;display:none;text-shadow:0 0 10px #0ff;cursor:pointer;padding:3vh 4vw;">TAP TO START</div>
     <div id="promoBar">
       <div class="promo-text" id="promoText">PLAY ONLINE FOR FREE AT<br>WWW.SONORAGAMEROOM.COM/PARTY</div>
       <img class="qr-code" id="promoQR" src="https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=https://www.sonoragameroom.com/party" alt="QR Code">
@@ -318,6 +321,20 @@ const audio = {
 audio.init();
 
 // ═══════════════════════════════════════
+// TILT CONTROLS (ONLINE MODE ONLY)
+// ═══════════════════════════════════════
+if (gameMode === 'online' && window.DeviceOrientationEvent) {
+  window.addEventListener('deviceorientation', function(e) {
+    if (e.gamma !== null) {
+      // gamma is the left-to-right tilt in degrees, range is -90 to 90
+      // Normalize to -1 to 1 range
+      tiltX = Math.max(-1, Math.min(1, e.gamma / 30));
+    }
+  });
+  console.log('Tilt controls enabled for online mode');
+}
+
+// ═══════════════════════════════════════
 // STATE
 // ═══════════════════════════════════════
 let player, platforms, bullets, enemies, powerups, particles, stars;
@@ -330,6 +347,7 @@ let scorePopups = []; // floating point indicators
 let deathFreeze = 0; // frames to freeze on death
 let deathPhrase = '';
 let lastShootFrame = 0; // for autofire
+let tiltX = 0; // for online tilt controls
 const GAME_OVER_QUIPS = [
   "Thanks for playing!",
   "Insert more coins to continue...",
@@ -1099,6 +1117,32 @@ document.addEventListener('keydown',e=>{
 
   // ── NAME ENTRY MODE ──
   if (nameEntry && !nameEntry.done) {
+    // Online mode: use keyboard input directly
+    if (gameMode === 'online') {
+      if (e.key === 'Enter') {
+        if (insertHighScore(nameEntry.name, score, heightScore)) {
+          nameEntry.done = true;
+          nameEntry.saveMsg = 'SAVED!';
+          setTimeout(returnToIntro, 2000);
+        } else {
+          nameEntry.name = '';
+          nameEntry.saveMsg = '';
+          nameEntry.rejected = true;
+          setTimeout(function(){ nameEntry.rejected = false; }, 2500);
+        }
+      } else if (e.key === 'Backspace') {
+        nameEntry.name = nameEntry.name.slice(0, -1);
+      } else if (e.key.length === 1 && nameEntry.name.length < 15) {
+        // Only add printable characters
+        if (e.key.match(/[a-zA-Z0-9 ]/)) {
+          nameEntry.name += e.key.toUpperCase();
+        }
+      }
+      e.preventDefault();
+      return;
+    }
+
+    // Arcade mode: use on-screen keyboard
     const c = nameEntry.cursor;
     const maxCol = c.row < 3 ? HS_COLS - 1 : 8;
     if (e.key === 'ArrowLeft') { c.col--; if (c.col < 0) c.col = maxCol; }
@@ -1166,6 +1210,10 @@ function updateMain() {
   if(keys['ArrowLeft']||keys['a']||keys['A']) mx=-1;
   if(keys['ArrowRight']||keys['d']||keys['D']) mx=1;
   if(touchDir!==0) mx=touchDir;
+  // Online mode: also use tilt controls
+  if(gameMode === 'online' && Math.abs(tiltX) > 0.1) {
+    mx = tiltX;
+  }
   player.vx=mx*PLAYER_SPEED;
   if(mx>0) player.facingRight=true;
   if(mx<0) player.facingRight=false;
@@ -1781,6 +1829,49 @@ function renderNameEntry() {
   const titleText = ne.type === 'both' ? 'NEW HIGH SCORES!' : ne.type === 'height' ? 'NEW HIGH HEIGHT!' : 'NEW HIGH SCORE!';
   ctx.fillText(titleText, W/2, H*0.08);
 
+  // Online mode: skip on-screen keyboard, just show keyboard input
+  if (gameMode === 'online') {
+    // Score
+    ctx.fillStyle = C.gold; ctx.font = 'bold '+Math.floor(32*S)+'px Orbitron,monospace';
+    if (ne.type === 'both') {
+      ctx.fillText('Points: ' + score.toLocaleString(), W/2, H*0.18);
+      ctx.fillText('Height: ' + heightScore.toLocaleString(), W/2, H*0.25);
+    } else if (ne.type === 'height') {
+      ctx.fillText('Height: ' + heightScore.toLocaleString(), W/2, H*0.18);
+    } else {
+      ctx.fillText('Points: ' + score.toLocaleString(), W/2, H*0.18);
+    }
+
+    // Name input
+    const nameY = H*0.4;
+    ctx.fillStyle = '#fff'; ctx.font = 'bold '+Math.floor(34*S)+'px Orbitron,monospace';
+    let displayName = ne.name;
+    if (!ne.done && ne.blink % 40 < 20) displayName += '_';
+    else if (!ne.done) displayName += ' ';
+    if (displayName.length === 0 && ne.blink % 40 < 20) displayName = '_';
+    ctx.fillText(displayName, W/2, nameY);
+
+    ctx.fillStyle = '#667'; ctx.font = Math.floor(14*S)+'px Orbitron,monospace';
+    ctx.fillText('TYPE YOUR NAME (' + ne.name.length + '/15)', W/2, nameY + H*0.06);
+    ctx.fillText('PRESS ENTER TO SUBMIT', W/2, nameY + H*0.10);
+
+    if (ne.done) {
+      ctx.fillStyle = C.neonCyan; ctx.font = 'bold '+Math.floor(24*S)+'px Orbitron,monospace';
+      ctx.fillText(ne.saveMsg || 'SAVED!', W/2, nameY + H*0.16);
+    }
+
+    if (ne.rejected) {
+      ctx.fillStyle = C.neonPink; ctx.font = 'bold '+Math.floor(18*S)+'px Orbitron,monospace';
+      ctx.fillText('KEEP IT CLEAN!', W/2, nameY + H*0.16);
+      ctx.fillStyle = '#aaa'; ctx.font = Math.floor(12*S)+'px Orbitron,monospace';
+      ctx.fillText('That name is not allowed. Try again.', W/2, nameY + H*0.20);
+    }
+
+    return; // Skip arcade keyboard rendering
+  }
+
+  // Arcade mode: continue with on-screen keyboard...
+
   // Score
   ctx.fillStyle = C.gold; ctx.font = 'bold '+Math.floor(32*S)+'px Orbitron,monospace';
   if (ne.type === 'both') {
@@ -2026,6 +2117,14 @@ function insertCoin() {
     document.getElementById('startPrompt').style.display='block';
     audio.playMenu(); // First user interaction unlocks audio
   }
+}
+
+// Initialize UI based on game mode
+if (gameMode === 'online') {
+  document.getElementById('tapPrompt').style.display = 'block';
+  coinInserted = true; // Skip coin insertion for online mode
+} else {
+  document.getElementById('coinPrompt').style.display = 'block';
 }
 
 loadHighScores();
