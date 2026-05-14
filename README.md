@@ -35,7 +35,8 @@ let gameMode = 'arcade'; // 'arcade' or 'online'
 ```
 GameRoomParty/
 ├── GameRoomParty.html     # Main game file (arcade mode by default)
-├── bonus_stage.html       # Bonus stage mini-game (iframe)
+├── bonus_stage.html       # Bridge bonus level (iframe)
+├── bonus_stage_space.html # Space shooter bonus level (iframe)
 ├── Music/                 # Audio files
 │   ├── menu.mp3
 │   ├── gameover.mp3
@@ -116,8 +117,12 @@ Rotating banner at bottom of start screen (8-second intervals):
 - **Helicopter** - Controlled hover
 
 ### Special Events
-- **Bonus Stage** - Collect 3 quarters to trigger quarter-collecting bridge mini-game
-- **Character Drops** - Nate (fries), Peter (quarters), Cody (hot wings)
+- **Bonus Stages** - Collect 3 quarters to trigger one of two bonus levels:
+  - **Bridge Stage** - Navigate 3D perspective bridge, collect quarters while avoiding bombs
+  - **Space Shooter** - Swordfish II-style rail shooter with 3 enemy types, boss battle, and powerups
+  - First bonus is randomly selected, then alternates between the two
+  - Both use iframe with identical launch sequence and score return mechanism
+- **Character Drops** - Nate (fries +1500pts), Peter (quarters +1500pts), Cody (spicy wings -500pts)
 
 ### Death Phrases
 50+ silly phrases displayed when you lose a life:
@@ -190,9 +195,9 @@ const DEATH_PHRASES = [
 - Target: 60 FPS on modern devices
 
 ## 🐛 Known Issues / TODO
-- Bonus stage joystick can stick (input reset added but may need refinement)
 - Mobile touch controls could use better visual feedback
 - No pause functionality currently
+- Space shooter bonus level uses procedural canvas drawing for all graphics (no sprite sheets)
 
 ## 🎯 Future Enhancements
 - Add pause menu
