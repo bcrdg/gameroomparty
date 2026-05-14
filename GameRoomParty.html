@@ -87,6 +87,43 @@
     font-size: 2.5vw; color: #fcee09; margin-top: 2vh; letter-spacing: 0.2vw;
     font-style: italic; opacity: 0.9;
   }
+  #nameInput {
+    position: fixed;
+    top: 45%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 85%;
+    max-width: 700px;
+    padding: 25px 20px;
+    font-family: 'Orbitron', monospace;
+    font-size: 36px;
+    font-weight: bold;
+    text-align: center;
+    color: #00ffff;
+    background: rgba(10, 6, 24, 0.95);
+    border: 4px solid #00ffff;
+    border-radius: 15px;
+    outline: none;
+    text-transform: uppercase;
+    display: none;
+    z-index: 1000;
+    box-shadow: 0 0 30px rgba(0, 255, 255, 0.5);
+    -webkit-appearance: none;
+    appearance: none;
+  }
+  #nameInput::placeholder {
+    color: rgba(0, 255, 255, 0.5);
+    font-size: 28px;
+  }
+  @media (max-width: 768px) {
+    #nameInput {
+      font-size: 28px;
+      padding: 20px 15px;
+    }
+    #nameInput::placeholder {
+      font-size: 22px;
+    }
+  }
   .btn {
     padding: 14px 52px; font-family: 'Orbitron', monospace;
     font-size: 18px; font-weight: 700; background: transparent;
@@ -135,6 +172,7 @@
     <div class="touch-zone left" ontouchstart="touchDir=-1" ontouchend="touchDir=0"></div>
     <div class="touch-zone right" ontouchstart="touchDir=1" ontouchend="touchDir=0"></div>
   </div>
+  <input type="text" id="nameInput" autocomplete="off" autocapitalize="characters" maxlength="15">
 </div>
 <script>var GAMEPLAY_TRACKS = GAMEPLAY_TRACKS || [];</script>
 <script src="Music/gameplay/tracks.js" onerror="console.warn('tracks.js not found')"></script>
@@ -382,6 +420,9 @@ let deathFreeze = 0; // frames to freeze on death
 let deathPhrase = '';
 let lastShootFrame = 0; // for autofire
 let tiltX = 0; // for online tilt controls
+let lastBestCamera = 0; // Track highest point reached
+let stuckCheckFrame = 0; // Last frame we made progress
+const STUCK_THRESHOLD = 300; // 5 seconds at 60fps
 const GAME_OVER_QUIPS = [
   "Thanks for playing!",
   "Insert more coins to continue...",
@@ -823,6 +864,59 @@ function startNameEntry() {
   else if (qualHeight) hsType = 'height';
 
   nameEntry = { name: '', cursor: { row: 0, col: 0 }, done: false, blink: 0, type: hsType };
+
+  // Online mode: show input field for mobile keyboard
+  if (gameMode === 'online') {
+    const input = document.getElementById('nameInput');
+    if (input) {
+      // Remove old listeners to avoid duplicates
+      input.replaceWith(input.cloneNode(true));
+      const newInput = document.getElementById('nameInput');
+      newInput.style.display = 'block';
+      newInput.value = '';
+      newInput.placeholder = 'TAP HERE TO TYPE';
+
+      newInput.addEventListener('input', function(e) {
+        nameEntry.name = e.target.value.toUpperCase().slice(0, 15);
+        e.target.value = nameEntry.name;
+      });
+
+      newInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          if (insertHighScore(nameEntry.name, score, heightScore)) {
+            nameEntry.done = true;
+            nameEntry.saveMsg = 'SAVED!';
+            newInput.style.display = 'none';
+            newInput.blur();
+            setTimeout(returnToIntro, 2000);
+          } else {
+            nameEntry.name = '';
+            e.target.value = '';
+            nameEntry.saveMsg = '';
+            nameEntry.rejected = true;
+            setTimeout(function(){ nameEntry.rejected = false; }, 2500);
+          }
+        }
+      });
+
+      // Add tap-to-focus for canvas area
+      const focusInput = function(e) {
+        e.preventDefault();
+        newInput.focus();
+      };
+      canvas.addEventListener('touchstart', focusInput);
+      canvas.addEventListener('click', focusInput);
+
+      // Store handler so we can remove it later
+      nameEntry.focusHandler = focusInput;
+
+      // Try to focus immediately
+      setTimeout(() => {
+        newInput.focus();
+      }, 100);
+    }
+  }
 }
 
 function getKBChar(row, col) {
@@ -1110,6 +1204,8 @@ function initGame() {
   mode='main';
   dropEvent=null; lastDropFrame=0; dropItems=[];
   wrapTipTimer = 600; // 10 seconds for wrap-around tip
+  lastBestCamera = 0; // Reset stuck detection
+  stuckCheckFrame = 0;
   initStars();
   platforms.push({x:W/2,y:H-50,type:'normal',hasSpring:false,broken:false,breakTimer:0,
     moveDir:0,moveSpeed:0,moveRange:0,moveOrigin:0});
@@ -1285,6 +1381,26 @@ function updateMain() {
   if(psy<H*0.35) camera=player.y-H*0.35;
   score=Math.max(score,Math.floor(-camera/4));
   heightScore=Math.max(heightScore,Math.floor(-camera/10)); // Height in units
+
+  // Stuck detection: spawn help if player hasn't progressed in 5 seconds
+  if(camera < lastBestCamera) {
+    lastBestCamera = camera;
+    stuckCheckFrame = frameCount;
+  }
+  if(frameCount - stuckCheckFrame > STUCK_THRESHOLD && frameCount > 120) {
+    // Player is stuck - spawn a rescue platform or enemy above them
+    const rescueY = player.y - 80*S;
+    if(Math.random() < 0.6) {
+      // Spawn a platform
+      platforms.push({x:player.x,y:rescueY,type:'normal',hasSpring:false,broken:false,breakTimer:0,
+        moveDir:0,moveSpeed:0,moveRange:0,moveOrigin:0});
+      spawnParticles(player.x,rescueY-camera,C.neonCyan,8);
+    } else {
+      // Spawn an enemy to bounce off
+      spawnEnemy(rescueY);
+    }
+    stuckCheckFrame = frameCount; // Reset to avoid spam
+  }
 
   // Autofire bullets (except when powerup is active - those don't shoot)
   if (!activePowerup && frameCount - lastShootFrame >= 20) { // Fire every 20 frames (~0.33 seconds)
@@ -1498,12 +1614,21 @@ function triggerGameOver(){
 
 function returnToIntro(){
   if(gameOverTimer) clearTimeout(gameOverTimer);
-  gameOverTimer=0; nameEntry=null;
+  gameOverTimer=0;
+  // Clean up name entry listeners
+  if (nameEntry && nameEntry.focusHandler) {
+    canvas.removeEventListener('touchstart', nameEntry.focusHandler);
+    canvas.removeEventListener('click', nameEntry.focusHandler);
+  }
+  nameEntry=null;
   gameOver=false; gameRunning=false; coinInserted=false;
   document.getElementById('gameOverScreen').style.display='none';
   document.getElementById('startScreen').style.display='flex';
   document.getElementById('coinPrompt').style.display='block';
   document.getElementById('startPrompt').style.display='none';
+  // Hide name input if visible
+  const input = document.getElementById('nameInput');
+  if (input) input.style.display = 'none';
   audio.stopAll();
 }
 
@@ -1876,18 +2001,12 @@ function renderNameEntry() {
       ctx.fillText('Points: ' + score.toLocaleString(), W/2, H*0.18);
     }
 
-    // Name input
-    const nameY = H*0.4;
-    ctx.fillStyle = '#fff'; ctx.font = 'bold '+Math.floor(34*S)+'px Orbitron,monospace';
-    let displayName = ne.name;
-    if (!ne.done && ne.blink % 40 < 20) displayName += '_';
-    else if (!ne.done) displayName += ' ';
-    if (displayName.length === 0 && ne.blink % 40 < 20) displayName = '_';
-    ctx.fillText(displayName, W/2, nameY);
+    // Name input - hide canvas cursor, let HTML input show
+    ctx.fillStyle = '#667'; ctx.font = Math.floor(18*S)+'px Orbitron,monospace';
+    ctx.fillText('TAP THE BOX BELOW TO ENTER YOUR NAME', W/2, H*0.32);
 
-    ctx.fillStyle = '#667'; ctx.font = Math.floor(14*S)+'px Orbitron,monospace';
-    ctx.fillText('TYPE YOUR NAME (' + ne.name.length + '/15)', W/2, nameY + H*0.06);
-    ctx.fillText('PRESS ENTER TO SUBMIT', W/2, nameY + H*0.10);
+    ctx.fillStyle = '#888'; ctx.font = Math.floor(14*S)+'px Orbitron,monospace';
+    ctx.fillText('(' + ne.name.length + '/15 characters)', W/2, H*0.36);
 
     if (ne.done) {
       ctx.fillStyle = C.neonCyan; ctx.font = 'bold '+Math.floor(24*S)+'px Orbitron,monospace';
@@ -2007,6 +2126,47 @@ function renderNameEntry() {
 function renderScrollingScores() {
   const lines = [];
 
+  // ARCADE section (show first)
+  if (jsonbinLoaded) {
+    lines.push({ type: 'maintitle', text: '═══════ ARCADE ═══════' });
+
+    // All-Time subsection
+    lines.push({ type: 'subtitle', text: '── ALL TIME ──' });
+    if (arcadeScores.allTimeScores.length > 0) {
+      lines.push({ type: 'minilabel', text: 'Points' });
+      for (let i = 0; i < Math.min(3, arcadeScores.allTimeScores.length); i++) {
+        const s = arcadeScores.allTimeScores[i];
+        lines.push({ type: 'score', rank: i+1, name: s.name, score: s.score });
+      }
+    }
+    if (arcadeScores.allTimeHeights.length > 0) {
+      lines.push({ type: 'minilabel', text: 'Height' });
+      for (let i = 0; i < Math.min(3, arcadeScores.allTimeHeights.length); i++) {
+        const s = arcadeScores.allTimeHeights[i];
+        lines.push({ type: 'score', rank: i+1, name: s.name, score: s.height });
+      }
+    }
+
+    // Weekly subsection
+    lines.push({ type: 'subtitle', text: '── THIS WEEK ──' });
+    if (arcadeScores.weeklyScores.length > 0) {
+      lines.push({ type: 'minilabel', text: 'Points' });
+      for (let i = 0; i < Math.min(3, arcadeScores.weeklyScores.length); i++) {
+        const s = arcadeScores.weeklyScores[i];
+        lines.push({ type: 'score', rank: i+1, name: s.name, score: s.score });
+      }
+    }
+    if (arcadeScores.weeklyHeights.length > 0) {
+      lines.push({ type: 'minilabel', text: 'Height' });
+      for (let i = 0; i < Math.min(3, arcadeScores.weeklyHeights.length); i++) {
+        const s = arcadeScores.weeklyHeights[i];
+        lines.push({ type: 'score', rank: i+1, name: s.name, score: s.height });
+      }
+    }
+
+    lines.push({ type: 'spacer' });
+  }
+
   // ONLINE section
   if (jsonbinLoaded) {
     lines.push({ type: 'maintitle', text: '═══════ ONLINE ═══════' });
@@ -2041,47 +2201,6 @@ function renderScrollingScores() {
       lines.push({ type: 'minilabel', text: 'Height' });
       for (let i = 0; i < Math.min(3, onlineScores.weeklyHeights.length); i++) {
         const s = onlineScores.weeklyHeights[i];
-        lines.push({ type: 'score', rank: i+1, name: s.name, score: s.height });
-      }
-    }
-
-    lines.push({ type: 'spacer' });
-  }
-
-  // ARCADE section
-  if (jsonbinLoaded) {
-    lines.push({ type: 'maintitle', text: '═══════ ARCADE ═══════' });
-
-    // All-Time subsection
-    lines.push({ type: 'subtitle', text: '── ALL TIME ──' });
-    if (arcadeScores.allTimeScores.length > 0) {
-      lines.push({ type: 'minilabel', text: 'Points' });
-      for (let i = 0; i < Math.min(3, arcadeScores.allTimeScores.length); i++) {
-        const s = arcadeScores.allTimeScores[i];
-        lines.push({ type: 'score', rank: i+1, name: s.name, score: s.score });
-      }
-    }
-    if (arcadeScores.allTimeHeights.length > 0) {
-      lines.push({ type: 'minilabel', text: 'Height' });
-      for (let i = 0; i < Math.min(3, arcadeScores.allTimeHeights.length); i++) {
-        const s = arcadeScores.allTimeHeights[i];
-        lines.push({ type: 'score', rank: i+1, name: s.name, score: s.height });
-      }
-    }
-
-    // Weekly subsection
-    lines.push({ type: 'subtitle', text: '── THIS WEEK ──' });
-    if (arcadeScores.weeklyScores.length > 0) {
-      lines.push({ type: 'minilabel', text: 'Points' });
-      for (let i = 0; i < Math.min(3, arcadeScores.weeklyScores.length); i++) {
-        const s = arcadeScores.weeklyScores[i];
-        lines.push({ type: 'score', rank: i+1, name: s.name, score: s.score });
-      }
-    }
-    if (arcadeScores.weeklyHeights.length > 0) {
-      lines.push({ type: 'minilabel', text: 'Height' });
-      for (let i = 0; i < Math.min(3, arcadeScores.weeklyHeights.length); i++) {
-        const s = arcadeScores.weeklyHeights[i];
         lines.push({ type: 'score', rank: i+1, name: s.name, score: s.height });
       }
     }
