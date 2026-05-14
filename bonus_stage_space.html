@@ -356,7 +356,7 @@ function update() {
       }
     }
   }
-  g.enemies = g.enemies.filter(function(e){return e.y < H+50 && e.y > -100;});
+  g.enemies = g.enemies.filter(function(e){return e.y < H+50 && e.y > -100*S;});
 
   // Update powerups
   for(var i=0; i<g.powerups.length; i++) {
