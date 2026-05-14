@@ -167,7 +167,8 @@
     <div class="touch-zone left" ontouchstart="touchDir=-1" ontouchend="touchDir=0"></div>
     <div class="touch-zone right" ontouchstart="touchDir=1" ontouchend="touchDir=0"></div>
   </div>
-  <input type="text" id="nameInput" autocomplete="off" autocapitalize="characters" maxlength="15" inputmode="text" placeholder="TAP TO TYPE YOUR NAME">
+  <input type="text" id="nameInput" autocomplete="off" autocapitalize="characters" maxlength="15" inputmode="text" placeholder="">
+  <button id="submitName" style="display:none;position:fixed;top:60%;left:50%;transform:translateX(-50%);padding:3vh 8vw;font-family:'Orbitron',monospace;font-size:6vw;font-weight:bold;color:#0a0618;background:#00ffff;border:none;border-radius:10px;text-shadow:none;box-shadow:0 0 30px rgba(0,255,255,0.8);cursor:pointer;z-index:10001;">DONE</button>
 </div>
 <script>var GAMEPLAY_TRACKS = GAMEPLAY_TRACKS || [];</script>
 <script src="Music/gameplay/tracks.js" onerror="console.warn('tracks.js not found')"></script>
@@ -868,14 +869,38 @@ function startNameEntry() {
   // Online mode: show input field for mobile keyboard
   if (gameMode === 'online') {
     const input = document.getElementById('nameInput');
-    if (input) {
+    const submitBtn = document.getElementById('submitName');
+    if (input && submitBtn) {
       // Remove old listeners to avoid duplicates
       input.replaceWith(input.cloneNode(true));
+      submitBtn.replaceWith(submitBtn.cloneNode(true));
+
       const newInput = document.getElementById('nameInput');
+      const newSubmitBtn = document.getElementById('submitName');
+
       newInput.style.display = 'block';
       newInput.value = '';
       newInput.readOnly = false;
       newInput.disabled = false;
+      newSubmitBtn.style.display = 'block';
+
+      const submitName = function() {
+        if (nameEntry.name.length === 0) return;
+        if (insertHighScore(nameEntry.name, score, heightScore)) {
+          nameEntry.done = true;
+          nameEntry.saveMsg = 'SAVED!';
+          newInput.style.display = 'none';
+          newSubmitBtn.style.display = 'none';
+          newInput.blur();
+          setTimeout(returnToIntro, 2000);
+        } else {
+          nameEntry.name = '';
+          newInput.value = '';
+          nameEntry.saveMsg = '';
+          nameEntry.rejected = true;
+          setTimeout(function(){ nameEntry.rejected = false; }, 2500);
+        }
+      };
 
       newInput.addEventListener('input', function(e) {
         nameEntry.name = e.target.value.toUpperCase().slice(0, 15);
@@ -885,24 +910,15 @@ function startNameEntry() {
       newInput.addEventListener('keydown', function(e) {
         if (e.key === 'Enter') {
           e.preventDefault();
-          if (insertHighScore(nameEntry.name, score, heightScore)) {
-            nameEntry.done = true;
-            nameEntry.saveMsg = 'SAVED!';
-            newInput.style.display = 'none';
-            newInput.blur();
-            setTimeout(returnToIntro, 2000);
-          } else {
-            nameEntry.name = '';
-            e.target.value = '';
-            nameEntry.saveMsg = '';
-            nameEntry.rejected = true;
-            setTimeout(function(){ nameEntry.rejected = false; }, 2500);
-          }
+          submitName();
         }
       });
 
-      // iOS requires user to tap input directly - no programmatic focus
-      // Just make it visible and tappable
+      newSubmitBtn.addEventListener('click', submitName);
+      newSubmitBtn.addEventListener('touchend', function(e) {
+        e.preventDefault();
+        submitName();
+      });
     }
   }
 }
@@ -1609,11 +1625,15 @@ function returnToIntro(){
   document.getElementById('startScreen').style.display='flex';
   document.getElementById('coinPrompt').style.display='block';
   document.getElementById('startPrompt').style.display='none';
-  // Hide name input if visible
+  // Hide name input and submit button if visible
   const input = document.getElementById('nameInput');
+  const submitBtn = document.getElementById('submitName');
   if (input) {
     input.style.display = 'none';
     input.blur();
+  }
+  if (submitBtn) {
+    submitBtn.style.display = 'none';
   }
   audio.stopAll();
 }
@@ -1987,17 +2007,16 @@ function renderNameEntry() {
       ctx.fillText('Points: ' + score.toLocaleString(), W/2, H*0.18);
     }
 
-    // Instruction text
-    ctx.fillStyle = C.neonCyan; ctx.font = 'bold '+Math.floor(24*S)+'px Orbitron,monospace';
-    ctx.fillText('TAP THE BLUE BOX TO TYPE', W/2, H*0.35);
-
-    ctx.fillStyle = '#888'; ctx.font = Math.floor(18*S)+'px Orbitron,monospace';
-    ctx.fillText('(Your name will appear as you type)', W/2, H*0.40);
-
-    // Show character count
+    // Show typed name in large letters
     if (ne.name.length > 0) {
+      ctx.fillStyle = '#fff'; ctx.font = 'bold '+Math.floor(48*S)+'px Orbitron,monospace';
+      ctx.fillText(ne.name, W/2, H*0.35);
+
       ctx.fillStyle = '#aaa'; ctx.font = Math.floor(16*S)+'px Orbitron,monospace';
-      ctx.fillText(ne.name.length + '/15 characters', W/2, H*0.70);
+      ctx.fillText(ne.name.length + '/15 characters', W/2, H*0.40);
+    } else {
+      ctx.fillStyle = '#666'; ctx.font = Math.floor(20*S)+'px Orbitron,monospace';
+      ctx.fillText('Enter your name...', W/2, H*0.35);
     }
 
     if (ne.done) {
