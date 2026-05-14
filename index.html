@@ -122,8 +122,8 @@
     <!-- Online Mode Prompt -->
     <div id="tapPrompt" class="blink-text" onclick="startGame()" style="font-size:4vw;color:#0ff;letter-spacing:0.5vw;text-transform:uppercase;display:none;text-shadow:0 0 10px #0ff;cursor:pointer;padding:3vh 4vw;">TAP TO START</div>
     <div id="promoBar">
-      <div class="promo-text" id="promoText">PLAY ONLINE FOR FREE AT<br>WWW.SONORAGAMEROOM.COM/PARTY</div>
-      <img class="qr-code" id="promoQR" src="https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=https://www.sonoragameroom.com/party" alt="QR Code">
+      <div class="promo-text" id="promoText">THE GAME ROOM<br>14888 PEACEFUL VALLEY RD, SONORA, CA 95370<br>(209) 536-4390</div>
+      <img class="qr-code" id="promoQR" src="https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=https://www.sonoragameroom.com/party" alt="QR Code" style="display:none;">
     </div>
   </div>
   <div id="gameOverScreen" style="display:none" onclick="if(!nameEntry)returnToIntro()">
@@ -335,15 +335,37 @@ audio.init();
 // ═══════════════════════════════════════
 // TILT CONTROLS (ONLINE MODE ONLY)
 // ═══════════════════════════════════════
-if (gameMode === 'online' && window.DeviceOrientationEvent) {
-  window.addEventListener('deviceorientation', function(e) {
+if (gameMode === 'online') {
+  // Request permission on iOS 13+
+  function enableTilt() {
+    if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+      // iOS 13+ requires permission
+      DeviceOrientationEvent.requestPermission()
+        .then(permissionState => {
+          if (permissionState === 'granted') {
+            window.addEventListener('deviceorientation', handleTilt);
+            console.log('Tilt controls enabled (iOS with permission)');
+          }
+        })
+        .catch(console.error);
+    } else if (window.DeviceOrientationEvent) {
+      // Non-iOS or older iOS - no permission needed
+      window.addEventListener('deviceorientation', handleTilt);
+      console.log('Tilt controls enabled');
+    }
+  }
+
+  function handleTilt(e) {
     if (e.gamma !== null) {
       // gamma is the left-to-right tilt in degrees, range is -90 to 90
       // Normalize to -1 to 1 range
       tiltX = Math.max(-1, Math.min(1, e.gamma / 30));
     }
-  });
-  console.log('Tilt controls enabled for online mode');
+  }
+
+  // Enable tilt on first user interaction (required for iOS)
+  document.addEventListener('touchstart', enableTilt, { once: true });
+  document.addEventListener('click', enableTilt, { once: true });
 }
 
 // ═══════════════════════════════════════
