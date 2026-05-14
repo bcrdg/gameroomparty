@@ -291,16 +291,19 @@ function update() {
           score += 1000;
           g.explosions.push({x:b.x, y:b.y, life:40});
           g.boss = null;
+          break; // Exit immediately after boss defeated
         }
         break;
       }
     }
 
-    // Boss collision with player
-    if(g.boss && Math.abs(b.x - g.playerX) < 50*S && Math.abs(b.y - g.playerY) < 50*S) {
-      g.health = 0;
-      endGame();
-      return;
+    // Boss collision with player (only if boss still exists)
+    if(g.boss) {
+      if(Math.abs(b.x - g.playerX) < 50*S && Math.abs(b.y - g.playerY) < 50*S) {
+        g.health = 0;
+        endGame();
+        return;
+      }
     }
   }
 
