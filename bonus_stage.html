@@ -405,6 +405,31 @@ function enableTilt() {
 document.addEventListener('touchstart', enableTilt, { once: true });
 document.addEventListener('click', enableTilt, { once: true });
 
+// ── XIN-MO GAMEPAD SUPPORT (same as main game) ──
+const PAD_MAP = {0:'ArrowLeft', 1:'ArrowDown', 2:'ArrowUp', 3:'ArrowRight', 4:'s'};
+const padPrev = {};
+function pollGamepad() {
+  var pads = navigator.getGamepads ? navigator.getGamepads() : [];
+  for (var i=0; i<pads.length; i++) {
+    var pad = pads[i];
+    if (!pad) continue;
+    for (var btnIdx in PAD_MAP) {
+      var key = PAD_MAP[btnIdx];
+      var cur = !!(pad.buttons[btnIdx] && pad.buttons[btnIdx].pressed);
+      if (cur && !padPrev[btnIdx]) {
+        keys[key] = true;
+        if(state==='ready'&&key==='s'){state='playing';initBonus();}
+        if(state==='done'&&key==='s'){state='ready';}
+      }
+      else if (!cur && padPrev[btnIdx]) keys[key] = false;
+      padPrev[btnIdx] = cur;
+    }
+    break;
+  }
+  requestAnimationFrame(pollGamepad);
+}
+requestAnimationFrame(pollGamepad);
+
 // ═══ UPDATE ═══
 function update() {
   if(state!=='playing'||!bon) return;
@@ -423,20 +448,6 @@ function update() {
   if(touchDir!==0) steer=touchDir;
   // Use tilt if available and significant
   if(Math.abs(tiltX) > 0.1) steer=tiltX;
-  // Gamepad support
-  var gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
-  for(var i=0; i<gamepads.length; i++) {
-    var gp = gamepads[i];
-    if(gp && gp.connected) {
-      // D-pad or left stick
-      if(gp.axes[0] < -0.3) steer=-1;
-      else if(gp.axes[0] > 0.3) steer=1;
-      // D-pad buttons (buttons 14=left, 15=right)
-      if(gp.buttons[14] && gp.buttons[14].pressed) steer=-1;
-      if(gp.buttons[15] && gp.buttons[15].pressed) steer=1;
-      break;
-    }
-  }
 
   b.tl+=steer*0.04;
   if(b.tl>0.85) b.tl=0.85;
