@@ -191,12 +191,14 @@ function drawBridgeAndCliffs() {
   // First: draw semi-transparent cliff voids on each side
   // Left void
   ctx.beginPath();
+  var lastLeft = null;
   for (var i=0;i<=B_SEGS;i++) {
     var z=(i/B_SEGS)*B_DEPTH; var p=proj(z,-1);
     if(i===0) ctx.moveTo(p.x,p.y); else ctx.lineTo(p.x,p.y);
+    if(i===B_SEGS) lastLeft = p;
   }
-  var nearLeft=proj(0,-1);
-  ctx.lineTo(nearLeft.x, H);
+  // From near edge of bridge down to bottom, then to screen edge, then back to horizon
+  ctx.lineTo(lastLeft.x, H);
   ctx.lineTo(0, H);
   ctx.lineTo(0, H*B_HORIZON);
   ctx.closePath();
@@ -204,12 +206,13 @@ function drawBridgeAndCliffs() {
 
   // Right void
   ctx.beginPath();
+  var lastRight = null;
   for (var i=0;i<=B_SEGS;i++) {
     var z=(i/B_SEGS)*B_DEPTH; var p=proj(z,1);
     if(i===0) ctx.moveTo(p.x,p.y); else ctx.lineTo(p.x,p.y);
+    if(i===B_SEGS) lastRight = p;
   }
-  var nearRight=proj(0,1);
-  ctx.lineTo(nearRight.x, H);
+  ctx.lineTo(lastRight.x, H);
   ctx.lineTo(W, H);
   ctx.lineTo(W, H*B_HORIZON);
   ctx.closePath();
