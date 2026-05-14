@@ -71,6 +71,9 @@
       font-size: 4vw;
       letter-spacing: 0.08vw;
     }
+    #versionInfo {
+      font-size: 3vw !important;
+    }
   }
   #gameOverScreen h2 {
     font-size: 7vw; font-weight: 900;
@@ -148,6 +151,7 @@
   <div id="startScreen">
     <h1>Game Room Party</h1>
     <div class="subtitle">reach the neon sky</div>
+    <div id="versionInfo" style="font-size:1.2vw;color:#888;margin-top:1vh;font-family:monospace;letter-spacing:0.1em;"></div>
     <!-- Arcade Mode Prompts -->
     <div id="coinPrompt" class="blink-text" onclick="insertCoin()" style="font-size:4vw;color:#fcee09;letter-spacing:0.5vw;text-transform:uppercase;margin-bottom:2vh;text-shadow:0 0 10px #fcee09;cursor:pointer;padding:3vh 4vw;display:none;">INSERT COIN [C]</div>
     <div id="startPrompt" class="blink-text" onclick="startGame()" style="font-size:4vw;color:#0ff;letter-spacing:0.5vw;text-transform:uppercase;display:none;text-shadow:0 0 10px #0ff;cursor:pointer;padding:3vh 4vw;">PRESS START [S]</div>
@@ -229,6 +233,11 @@ const JSONBIN_URL = `https://api.jsonbin.io/v3/b/${JSONBIN_BIN_ID}`;
 // Set to 'online' for web version (keyboard/touch)
 // This determines which JSONBin leaderboard scores are saved to
 let gameMode = 'arcade'; // Default to arcade
+
+// Version tracking
+const VERSION_BASE = '0.0001';    // Shared features (both arcade & online)
+const VERSION_ARCADE = '0.0001';  // Arcade-specific features
+const VERSION_ONLINE = '0.0001';  // Online-specific features
 
 // ═══════════════════════════════════════
 // AUDIO MANAGER
@@ -2265,6 +2274,13 @@ if (gameMode === 'online') {
   coinInserted = true; // Skip coin insertion for online mode
 } else {
   document.getElementById('coinPrompt').style.display = 'block';
+}
+
+// Display version info
+const versionInfo = document.getElementById('versionInfo');
+if (versionInfo) {
+  const modeVersion = gameMode === 'online' ? `O-${VERSION_ONLINE}` : `A-${VERSION_ARCADE}`;
+  versionInfo.textContent = `${modeVersion} | B-${VERSION_BASE}`;
 }
 
 loadHighScores();
