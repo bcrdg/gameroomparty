@@ -2262,8 +2262,22 @@ if (gameMode === 'online') {
 loadHighScores();
 gameLoop();
 
-// Rotate promo messages (same for both arcade and online)
-const promoMessages = [
+// Arcade banners - promote online version
+const arcadeMessages = [
+  {
+    text: 'PLAY ONLINE FOR FREE AT<br>WWW.SONORAGAMEROOM.COM/PARTY',
+    showQR: true,
+    link: null
+  },
+  {
+    text: 'SCAN TO PLAY ON YOUR PHONE!<br>COMPETE WITH PLAYERS AROUND THE WORLD',
+    showQR: true,
+    link: null
+  }
+];
+
+// Online banners - promote game room specials
+const onlineMessages = [
   {
     text: 'THE GAME ROOM<br>14888 PEACEFUL VALLEY RD, SONORA, CA 95370<br>(209) 536-4390',
     showQR: false,
@@ -2305,6 +2319,9 @@ const promoMessages = [
     link: 'https://sonoragameroom.com/events/'
   }
 ];
+
+// Use appropriate messages based on game mode
+const promoMessages = gameMode === 'arcade' ? arcadeMessages : onlineMessages;
 
 let currentPromo = 0;
 
