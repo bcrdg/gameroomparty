@@ -1330,6 +1330,33 @@ canvas.addEventListener('touchstart',e=>{
   if(mode==='main') shoot();
 });
 
+// ── XIN-MO DUAL ARCADE (HID GAMEPAD) ──
+// B0=Left, B1=Down, B2=Up, B3=Right, B4=Start. B7=Coin (active-low: held in normal state, releases on coin).
+const PAD_MAP = {0:'ArrowLeft', 1:'ArrowDown', 2:'ArrowUp', 3:'ArrowRight', 4:'s'};
+const PAD_COIN_BTN = 7;
+const padPrev = {};
+let padCoinPrev = false, padCoinArmed = false;
+function pollGamepad() {
+  const pads = navigator.getGamepads ? navigator.getGamepads() : [];
+  for (const pad of pads) {
+    if (!pad) continue;
+    for (const i in PAD_MAP) {
+      const key = PAD_MAP[i];
+      const cur = !!(pad.buttons[i] && pad.buttons[i].pressed);
+      if (cur && !padPrev[i]) document.dispatchEvent(new KeyboardEvent('keydown', {key}));
+      else if (!cur && padPrev[i]) document.dispatchEvent(new KeyboardEvent('keyup', {key}));
+      padPrev[i] = cur;
+    }
+    const coinCur = !!(pad.buttons[PAD_COIN_BTN] && pad.buttons[PAD_COIN_BTN].pressed);
+    if (coinCur) padCoinArmed = true;
+    if (padCoinArmed && padCoinPrev && !coinCur) document.dispatchEvent(new KeyboardEvent('keydown', {key:'c'}));
+    padCoinPrev = coinCur;
+    break;
+  }
+  requestAnimationFrame(pollGamepad);
+}
+requestAnimationFrame(pollGamepad);
+
 function shoot() {
   if(!gameRunning||gameOver) return;
   bullets.push({x:player.x+(player.facingRight?18*S:-18*S),y:player.y-20*S,vy:-BULLET_SPEED});
@@ -1392,13 +1419,14 @@ function updateMain() {
     stuckCheckFrame = frameCount;
   }
   if(frameCount - stuckCheckFrame > STUCK_THRESHOLD && frameCount > 120) {
-    // Player is stuck - spawn a rescue platform or enemy above them
-    const rescueY = player.y - 80*S;
-    if(Math.random() < 0.6) {
-      // Spawn a platform
-      platforms.push({x:player.x,y:rescueY,type:'normal',hasSpring:false,broken:false,breakTimer:0,
+    // Player is stuck - spawn a rescue platform or enemy close above them
+    const rescueY = player.y - 40*S; // Spawn closer for easier reach
+    if(Math.random() < 0.7) {
+      // Spawn a platform slightly offset so it's visible
+      const offsetX = player.x + (Math.random() - 0.5) * 60*S;
+      platforms.push({x:Math.max(50*S, Math.min(W-50*S, offsetX)),y:rescueY,type:'normal',hasSpring:false,broken:false,breakTimer:0,
         moveDir:0,moveSpeed:0,moveRange:0,moveOrigin:0});
-      spawnParticles(player.x,rescueY-camera,C.neonCyan,8);
+      spawnParticles(offsetX,rescueY-camera,C.neonCyan,8);
     } else {
       // Spawn an enemy to bounce off
       spawnEnemy(rescueY);
