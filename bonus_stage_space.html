@@ -207,11 +207,13 @@ function update() {
     g.boss = {
       x: W/2,
       y: -100*S,
-      vx: 2*S,
+      vx: 3*S,
       vy: 1*S,
-      health: 30,
-      maxHealth: 30,
-      shootTimer: 0
+      health: 50,
+      maxHealth: 50,
+      shootTimer: 0,
+      burstTimer: 0,
+      phase: 0
     };
   }
 
@@ -245,13 +247,37 @@ function update() {
     if(b.y > H*0.2) b.vy = 0;
     if(b.x < 100*S || b.x > W-100*S) b.vx *= -1;
 
-    // Boss shooting
+    // Boss gets faster at low health
+    if(b.health < b.maxHealth * 0.3) {
+      b.vx = b.vx > 0 ? 5*S : -5*S;
+    }
+
+    // Boss multi-phase attacks
     b.shootTimer++;
-    if(b.shootTimer > 30) {
+    b.burstTimer++;
+
+    // Phase 1: Tracking shots
+    if(b.shootTimer > 25) {
       b.shootTimer = 0;
-      // Spawn enemy bullets
       var angle = Math.atan2(g.playerY - b.y, g.playerX - b.x);
-      g.enemies.push({type:'bullet', x:b.x, y:b.y, vx:Math.cos(angle)*3*S, vy:Math.sin(angle)*3*S, health:1});
+      g.enemies.push({type:'bullet', x:b.x-30*S, y:b.y, vx:Math.cos(angle)*4*S, vy:Math.sin(angle)*4*S, health:1});
+      g.enemies.push({type:'bullet', x:b.x+30*S, y:b.y, vx:Math.cos(angle)*4*S, vy:Math.sin(angle)*4*S, health:1});
+    }
+
+    // Phase 2: Spread burst
+    if(b.burstTimer > 90) {
+      b.burstTimer = 0;
+      for(var ang=-60; ang<=60; ang+=15) {
+        var rad = (ang + 90) * Math.PI/180;
+        g.enemies.push({type:'bullet', x:b.x, y:b.y, vx:Math.cos(rad)*5*S, vy:Math.sin(rad)*5*S, health:1});
+      }
+    }
+
+    // Phase 3: Spawn minions when damaged
+    if(b.health < b.maxHealth * 0.5 && b.phase === 0) {
+      b.phase = 1;
+      g.enemies.push({type:'fighter', x:b.x-80*S, y:b.y, vx:0, vy:3*S, health:2});
+      g.enemies.push({type:'fighter', x:b.x+80*S, y:b.y, vx:0, vy:3*S, health:2});
     }
 
     // Check bullet collision with boss
@@ -265,16 +291,19 @@ function update() {
           score += 1000;
           g.explosions.push({x:b.x, y:b.y, life:40});
           g.boss = null;
+          break; // Exit immediately after boss defeated
         }
         break;
       }
     }
 
-    // Boss collision with player
-    if(g.boss && Math.abs(b.x - g.playerX) < 50*S && Math.abs(b.y - g.playerY) < 50*S) {
-      g.health = 0;
-      endGame();
-      return;
+    // Boss collision with player (only if boss still exists)
+    if(g.boss) {
+      if(Math.abs(b.x - g.playerX) < 50*S && Math.abs(b.y - g.playerY) < 50*S) {
+        g.health = 0;
+        endGame();
+        return;
+      }
     }
   }
 
@@ -410,40 +439,100 @@ function render() {
   if(!game) return;
   var g = game;
 
-  // Draw player ship (robot in spaceship)
+  // Draw player ship (Swordfish II style)
   ctx.save();
   ctx.translate(g.playerX, g.playerY);
   ctx.scale(S, S);
 
-  // Ship body
-  ctx.fillStyle = '#22a844';
+  // Elongated nose cone (signature Swordfish II feature)
+  ctx.fillStyle = '#cc3333';
   ctx.beginPath();
-  ctx.moveTo(0, -30);
-  ctx.lineTo(-20, 10);
-  ctx.lineTo(20, 10);
+  ctx.moveTo(0, -35);
+  ctx.lineTo(-3, -25);
+  ctx.lineTo(-5, -15);
+  ctx.lineTo(-5, -5);
+  ctx.lineTo(5, -5);
+  ctx.lineTo(5, -15);
+  ctx.lineTo(3, -25);
   ctx.closePath();
   ctx.fill();
-  ctx.strokeStyle = '#186830';
-  ctx.lineWidth = 2;
+  ctx.strokeStyle = '#991111';
+  ctx.lineWidth = 1;
   ctx.stroke();
 
-  // Cockpit (robot visible)
-  ctx.fillStyle = '#7b3fa8';
+  // Main fuselage
+  ctx.fillStyle = '#dd4444';
+  ctx.fillRect(-6, -5, 12, 18);
+  ctx.strokeStyle = '#991111';
+  ctx.strokeRect(-6, -5, 12, 18);
+
+  // Cockpit canopy (showing robot pilot)
+  ctx.fillStyle = 'rgba(100, 200, 255, 0.6)';
   ctx.beginPath();
-  ctx.arc(0, -10, 8, 0, 6.28);
+  ctx.arc(0, -2, 5, 0, 6.28);
   ctx.fill();
+  ctx.strokeStyle = '#4488cc';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  // Robot head visible in cockpit
+  ctx.fillStyle = '#22a844';
+  ctx.fillRect(-2.5, -4, 5, 4);
   ctx.fillStyle = '#3366ee';
-  ctx.fillRect(-4, -15, 8, 6);
+  ctx.fillRect(-2, -3, 1.5, 1.5);
+  ctx.fillRect(0.5, -3, 1.5, 1.5);
 
-  // Wings
-  ctx.fillStyle = '#3344dd';
-  ctx.fillRect(-35, 0, 15, 4);
-  ctx.fillRect(20, 0, 15, 4);
+  // Swept-back wings (distinctive Swordfish feature)
+  ctx.fillStyle = '#ee5555';
+  ctx.beginPath();
+  // Left wing
+  ctx.moveTo(-6, 2);
+  ctx.lineTo(-28, 12);
+  ctx.lineTo(-26, 15);
+  ctx.lineTo(-8, 8);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = '#aa2222';
+  ctx.lineWidth = 1;
+  ctx.stroke();
 
-  // Engines
-  ctx.fillStyle = '#ff6600';
-  ctx.fillRect(-15, 8, 6, 8);
-  ctx.fillRect(9, 8, 6, 8);
+  // Right wing
+  ctx.beginPath();
+  ctx.moveTo(6, 2);
+  ctx.lineTo(28, 12);
+  ctx.lineTo(26, 15);
+  ctx.lineTo(8, 8);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  // Wing details/panels
+  ctx.strokeStyle = '#cc3333';
+  ctx.beginPath();
+  ctx.moveTo(-18, 10);
+  ctx.lineTo(-12, 7);
+  ctx.moveTo(18, 10);
+  ctx.lineTo(12, 7);
+  ctx.stroke();
+
+  // Engine exhausts
+  ctx.fillStyle = '#883333';
+  ctx.fillRect(-5, 13, 3, 5);
+  ctx.fillRect(2, 13, 3, 5);
+
+  // Engine glow
+  ctx.fillStyle = '#ff8800';
+  ctx.fillRect(-5, 16, 3, 3);
+  ctx.fillRect(2, 16, 3, 3);
+
+  // Tail fin
+  ctx.fillStyle = '#cc3333';
+  ctx.beginPath();
+  ctx.moveTo(0, 10);
+  ctx.lineTo(-3, 18);
+  ctx.lineTo(3, 18);
+  ctx.closePath();
+  ctx.fill();
 
   ctx.restore();
 
@@ -464,23 +553,86 @@ function render() {
     ctx.translate(b.x, b.y);
     ctx.scale(S, S);
 
-    // Boss body
-    ctx.fillStyle = '#550000';
-    ctx.fillRect(-40, -30, 80, 60);
-    ctx.strokeStyle = '#ff0000';
+    // Boss outer armor shell
+    ctx.fillStyle = '#330000';
+    ctx.fillRect(-55, -40, 110, 80);
+    ctx.strokeStyle = '#660000';
     ctx.lineWidth = 3;
-    ctx.strokeRect(-40, -30, 80, 60);
+    ctx.strokeRect(-55, -40, 110, 80);
 
-    // Boss cannons
+    // Armor plating
+    ctx.fillStyle = '#440000';
+    ctx.fillRect(-50, -35, 48, 35);
+    ctx.fillRect(2, -35, 48, 35);
+    ctx.fillRect(-50, 0, 48, 35);
+    ctx.fillRect(2, 0, 48, 35);
+
+    // Armor panel lines
+    ctx.strokeStyle = '#550000';
+    ctx.lineWidth = 2;
+    for(var i=-40; i<=30; i+=10) {
+      ctx.beginPath();
+      ctx.moveTo(-50, i);
+      ctx.lineTo(50, i);
+      ctx.stroke();
+    }
+
+    // Heavy cannon mounts
+    ctx.fillStyle = '#222222';
+    ctx.fillRect(-65, -15, 20, 10);
+    ctx.fillRect(45, -15, 20, 10);
+
+    // Cannon barrels
     ctx.fillStyle = '#aa0000';
-    ctx.fillRect(-50, -10, 15, 8);
-    ctx.fillRect(35, -10, 15, 8);
+    ctx.fillRect(-70, -12, 30, 4);
+    ctx.fillRect(40, -12, 30, 4);
 
-    // Boss core
+    // Cannon tips
     ctx.fillStyle = '#ff6600';
+    ctx.fillRect(-72, -13, 5, 6);
+    ctx.fillRect(67, -13, 5, 6);
+
+    // Central armor ridge
+    ctx.fillStyle = '#550000';
     ctx.beginPath();
-    ctx.arc(0, 0, 15, 0, 6.28);
+    ctx.moveTo(-30, -38);
+    ctx.lineTo(0, -45);
+    ctx.lineTo(30, -38);
+    ctx.lineTo(30, -35);
+    ctx.lineTo(0, -42);
+    ctx.lineTo(-30, -35);
+    ctx.closePath();
     ctx.fill();
+
+    // Boss core (pulsing)
+    var pulse = Math.sin(Date.now()*0.01)*0.2 + 1;
+    ctx.fillStyle = '#ff6600';
+    ctx.shadowBlur = 20;
+    ctx.shadowColor = '#ff6600';
+    ctx.beginPath();
+    ctx.arc(0, 0, 18*pulse, 0, 6.28);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+
+    // Core inner ring
+    ctx.fillStyle = '#ffaa00';
+    ctx.beginPath();
+    ctx.arc(0, 0, 12, 0, 6.28);
+    ctx.fill();
+
+    // Core center
+    ctx.fillStyle = '#ffff00';
+    ctx.beginPath();
+    ctx.arc(0, 0, 6, 0, 6.28);
+    ctx.fill();
+
+    // Engine exhausts
+    ctx.fillStyle = '#222';
+    ctx.fillRect(-45, 35, 12, 8);
+    ctx.fillRect(33, 35, 12, 8);
+    ctx.fillStyle = '#ff8800';
+    ctx.fillRect(-45, 40, 12, 5);
+    ctx.fillRect(33, 40, 12, 5);
 
     ctx.restore();
 
@@ -513,46 +665,134 @@ function render() {
     if(e.type === 'bullet') {
       // Enemy bullet
       ctx.fillStyle = '#ff6600';
+      ctx.shadowBlur = 8;
+      ctx.shadowColor = '#ff6600';
       ctx.beginPath();
       ctx.arc(0, 0, 4, 0, 6.28);
       ctx.fill();
+      ctx.shadowBlur = 0;
     } else if(e.type === 'fighter') {
-      // Fast fighter (small, red)
-      ctx.fillStyle = '#cc3333';
+      // Fast fighter - angular, aggressive design
+      ctx.fillStyle = '#aa2222';
       ctx.beginPath();
-      ctx.moveTo(0, 15);
-      ctx.lineTo(-10, -8);
-      ctx.lineTo(10, -8);
+      ctx.moveTo(0, 16);
+      ctx.lineTo(-8, 8);
+      ctx.lineTo(-12, -2);
+      ctx.lineTo(-10, -10);
+      ctx.lineTo(-5, -12);
+      ctx.lineTo(0, -8);
+      ctx.lineTo(5, -12);
+      ctx.lineTo(10, -10);
+      ctx.lineTo(12, -2);
+      ctx.lineTo(8, 8);
       ctx.closePath();
       ctx.fill();
+      ctx.strokeStyle = '#550000';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+
+      // Cockpit
       ctx.fillStyle = '#ff6600';
       ctx.beginPath();
-      ctx.arc(0, 0, 4, 0, 6.28);
+      ctx.arc(0, 2, 5, 0, 6.28);
       ctx.fill();
+
+      // Wing details
+      ctx.strokeStyle = '#cc3333';
+      ctx.beginPath();
+      ctx.moveTo(-10, -8);
+      ctx.lineTo(-8, 0);
+      ctx.moveTo(10, -8);
+      ctx.lineTo(8, 0);
+      ctx.stroke();
+
+      // Engine glow
+      ctx.fillStyle = '#ff8800';
+      ctx.fillRect(-3, 13, 2, 4);
+      ctx.fillRect(1, 13, 2, 4);
     } else if(e.type === 'tank') {
-      // Tank (big, slow, tough)
-      ctx.fillStyle = '#666666';
-      ctx.fillRect(-15, -15, 30, 30);
-      ctx.strokeStyle = '#333';
+      // Tank - heavily armored, boxy design
+      ctx.fillStyle = '#555555';
+      ctx.fillRect(-18, -18, 36, 36);
+
+      // Armor plating
+      ctx.strokeStyle = '#888888';
       ctx.lineWidth = 2;
-      ctx.strokeRect(-15, -15, 30, 30);
+      ctx.strokeRect(-18, -18, 36, 36);
+      ctx.strokeRect(-14, -14, 28, 28);
+
+      // Armor panels
+      ctx.fillStyle = '#333333';
+      ctx.fillRect(-16, -16, 8, 8);
+      ctx.fillRect(8, -16, 8, 8);
+      ctx.fillRect(-16, 8, 8, 8);
+      ctx.fillRect(8, 8, 8, 8);
+
+      // Central turret
+      ctx.fillStyle = '#666666';
+      ctx.beginPath();
+      ctx.arc(0, 0, 12, 0, 6.28);
+      ctx.fill();
+      ctx.strokeStyle = '#888';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      // Turret cannon
+      ctx.fillStyle = '#222';
+      ctx.fillRect(-2, -15, 4, 18);
+
+      // Core/weak point
       ctx.fillStyle = '#ff0000';
-      ctx.fillRect(-8, -8, 16, 16);
+      ctx.beginPath();
+      ctx.arc(0, 0, 6, 0, 6.28);
+      ctx.fill();
     } else if(e.type === 'weaver') {
-      // Weaver (purple, moves side to side)
+      // Weaver - sleek purple ship with curved design
       ctx.fillStyle = '#9b3fd8';
       ctx.beginPath();
-      ctx.moveTo(0, 18);
-      ctx.lineTo(-12, -5);
-      ctx.lineTo(-8, -10);
-      ctx.lineTo(8, -10);
-      ctx.lineTo(12, -5);
+      ctx.moveTo(0, 20);
+      ctx.lineTo(-8, 10);
+      ctx.lineTo(-14, -2);
+      ctx.lineTo(-10, -12);
+      ctx.lineTo(0, -14);
+      ctx.lineTo(10, -12);
+      ctx.lineTo(14, -2);
+      ctx.lineTo(8, 10);
       ctx.closePath();
       ctx.fill();
-      // Wings
+      ctx.strokeStyle = '#6b2fa8';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+
+      // Curved wings
       ctx.fillStyle = '#7b3fa8';
-      ctx.fillRect(-20, 0, 10, 3);
-      ctx.fillRect(10, 0, 10, 3);
+      ctx.beginPath();
+      ctx.ellipse(-18, 4, 8, 4, Math.PI*0.3, 0, 6.28);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.ellipse(18, 4, 8, 4, -Math.PI*0.3, 0, 6.28);
+      ctx.fill();
+
+      // Wing details
+      ctx.strokeStyle = '#9b3fd8';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(-22, 2);
+      ctx.lineTo(-12, 6);
+      ctx.moveTo(22, 2);
+      ctx.lineTo(12, 6);
+      ctx.stroke();
+
+      // Cockpit glow
+      ctx.fillStyle = '#dd88ff';
+      ctx.beginPath();
+      ctx.arc(0, 0, 5, 0, 6.28);
+      ctx.fill();
+
+      // Engine trails
+      ctx.fillStyle = '#aa55dd';
+      ctx.fillRect(-4, 16, 2, 5);
+      ctx.fillRect(2, 16, 2, 5);
     }
 
     ctx.restore();
