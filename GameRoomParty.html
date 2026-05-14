@@ -1696,19 +1696,26 @@ function startBonusTransition() {
   mode = 'bonus';
   audio.playBonus();
 
-  // Choose bonus level: random first time, then alternate
+  // Choose bonus level
   var bonusFile;
-  if (nextBonusLevel === null) {
-    // First bonus: random choice
-    nextBonusLevel = Math.random() < 0.5 ? 'bridge' : 'space';
-  }
 
-  if (nextBonusLevel === 'bridge') {
+  if (gameMode === 'online') {
+    // Online mode: always bridge (space shooter is arcade-only)
     bonusFile = 'bonus_stage.html';
-    nextBonusLevel = 'space'; // Next time play space
   } else {
-    bonusFile = 'bonus_stage_space.html';
-    nextBonusLevel = 'bridge'; // Next time play bridge
+    // Arcade mode: random first time, then alternate between both
+    if (nextBonusLevel === null) {
+      // First bonus: random choice
+      nextBonusLevel = Math.random() < 0.5 ? 'bridge' : 'space';
+    }
+
+    if (nextBonusLevel === 'bridge') {
+      bonusFile = 'bonus_stage.html';
+      nextBonusLevel = 'space'; // Next time play space
+    } else {
+      bonusFile = 'bonus_stage_space.html';
+      nextBonusLevel = 'bridge'; // Next time play bridge
+    }
   }
 
   // Launch bonus stage in fullscreen iframe
