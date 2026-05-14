@@ -20,6 +20,13 @@
     display: flex; justify-content: center; align-items: center;
     position: relative;
   }
+  /* Desktop: constrain width to arcade cabinet proportions */
+  @media (min-width: 768px) and (orientation: landscape) {
+    #gameContainer {
+      max-width: min(600px, 40vh);
+      margin: 0 auto;
+    }
+  }
   canvas { display: block; }
   #startScreen {
     position: absolute; top: 0; left: 0; width: 100%; height: 100%;
@@ -1992,11 +1999,15 @@ function render() {
     const flash = deathFreeze > 100 ? (deathFreeze % 6 < 3 ? 1 : 0.3) : 1;
     ctx.globalAlpha = freezeAlpha * flash;
 
-    // Death phrase header - scale font for longer text
+    // Death phrase header - shrink font to fit canvas width
     ctx.fillStyle = C.neonPink;
-    const phraseLen = deathPhrase.length;
-    const phraseFontSize = phraseLen > 20 ? Math.floor(24 * S) : phraseLen > 12 ? Math.floor(30 * S) : Math.floor(38 * S);
+    const maxPhraseWidth = W * 0.9;
+    let phraseFontSize = Math.floor(38 * S);
     ctx.font = 'bold ' + phraseFontSize + 'px Orbitron,monospace';
+    while (phraseFontSize > 10 && ctx.measureText(deathPhrase).width > maxPhraseWidth) {
+      phraseFontSize -= 2;
+      ctx.font = 'bold ' + phraseFontSize + 'px Orbitron,monospace';
+    }
     ctx.fillText(deathPhrase, W / 2, H * 0.38);
 
     ctx.globalAlpha = freezeAlpha;
