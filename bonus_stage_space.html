@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Space Shooter Bonus</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap');
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{width:100%;height:100%;overflow:hidden;background:#000;
+    font-family:'Orbitron',monospace;touch-action:none;-webkit-user-select:none;user-select:none}
+  canvas{display:block}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script>
+var canvas = document.getElementById('c');
+var ctx = canvas.getContext('2d');
+var W = 800, H = 600, S = 1;
+var BASE_W = 420;
+
+function resize() {
+  W = window.innerWidth; H = window.innerHeight;
+  canvas.width = W; canvas.height = H;
+  S = W / BASE_W;
+  buildStars();
+}
+
+// ═══ COLORS ═══
+var NC='#00ffff', NP='#ff2d95', NY='#fcee09', NV='#b537f2', GD='#ffd700';
+
+// ═══ STATE ═══
+var state = 'ready';
+var game = null;
+var keys = {};
+var touchX = 0, touchActive = false;
+var tiltX = 0;
+var score = 0;
+
+// Stars
+var stars = [];
+function buildStars() {
+  stars = [];
+  for (var i = 0; i < 200; i++) {
+    stars.push({
+      x: Math.random()*W,
+      y: Math.random()*H,
+      z: Math.random(),
+      speed: 2 + Math.random()*8
+    });
+  }
+}
+
+resize();
+window.addEventListener('resize', resize);
+
+// ═══ GAME OBJECT ═══
+function initGame() {
+  score = 0;
+  game = {
+    playerX: W/2,
+    playerY: H*0.8,
+    speed: 3*S,
+    bullets: [],
+    enemies: [],
+    explosions: [],
+    timer: 30*60, // 30 seconds
+    spawnCounter: 0,
+    health: 3
+  };
+}
+
+// ═══ INPUT ═══
+document.addEventListener('keydown',function(e){
+  keys[e.key]=true;
+  if(state==='ready'&&(e.key===' '||e.key==='s'||e.key==='S')){state='playing';initGame();}
+  if(state==='done'&&(e.key===' '||e.key==='s'||e.key==='S')){state='ready';}
+});
+document.addEventListener('keyup',function(e){keys[e.key]=false;});
+
+canvas.addEventListener('touchstart',function(e){
+  e.preventDefault();
+  if(state==='ready'){state='playing';initGame();return;}
+  if(state==='done'){state='ready';return;}
+  touchActive = true;
+  touchX = e.touches[0].clientX;
+});
+canvas.addEventListener('touchmove',function(e){
+  e.preventDefault();
+  if(touchActive) touchX = e.touches[0].clientX;
+});
+canvas.addEventListener('touchend',function(){touchActive=false;});
+
+// Tilt controls
+function handleTilt(e) {
+  if (e.gamma !== null) {
+    tiltX = Math.max(-1, Math.min(1, e.gamma / 30));
+  }
+}
+function enableTilt() {
+  if (typeof DeviceOrientationEvent !== 'undefined' &&
+      typeof DeviceOrientationEvent.requestPermission === 'function') {
+    DeviceOrientationEvent.requestPermission()
+      .then(function(permissionState) {
+        if (permissionState === 'granted') {
+          window.addEventListener('deviceorientation', handleTilt);
+        }
+      });
+  } else if (window.DeviceOrientationEvent) {
+    window.addEventListener('deviceorientation', handleTilt);
+  }
+}
+document.addEventListener('touchstart', enableTilt, { once: true });
+document.addEventListener('click', enableTilt, { once: true });
+
+// ── XIN-MO GAMEPAD SUPPORT ──
+const PAD_MAP = {0:'ArrowLeft', 1:'ArrowDown', 2:'ArrowUp', 3:'ArrowRight', 4:'s'};
+const padPrev = {};
+function pollGamepad() {
+  var pads = navigator.getGamepads ? navigator.getGamepads() : [];
+  for (var i=0; i<pads.length; i++) {
+    var pad = pads[i];
+    if (!pad) continue;
+    for (var btnIdx in PAD_MAP) {
+      var key = PAD_MAP[btnIdx];
+      var cur = !!(pad.buttons[btnIdx] && pad.buttons[btnIdx].pressed);
+      if (cur && !padPrev[btnIdx]) {
+        keys[key] = true;
+        if(state==='ready'&&key==='s'){state='playing';initGame();}
+        if(state==='done'&&key==='s'){state='ready';}
+      }
+      else if (!cur && padPrev[btnIdx]) keys[key] = false;
+      padPrev[btnIdx] = cur;
+    }
+    break;
+  }
+  requestAnimationFrame(pollGamepad);
+}
+requestAnimationFrame(pollGamepad);
+
+// ═══ UPDATE ═══
+function update() {
+  if(state!=='playing'||!game) return;
+  var g = game;
+
+  g.timer--;
+  if(g.timer<=0){endGame();return;}
+
+  // Player movement
+  var mx = 0;
+  if(keys['ArrowLeft']||keys['a']||keys['A']) mx=-1;
+  if(keys['ArrowRight']||keys['d']||keys['D']) mx=1;
+  if(touchActive) mx = (touchX - g.playerX) / (W/2);
+  if(Math.abs(tiltX) > 0.1) mx = tiltX;
+
+  g.playerX += mx * g.speed * 2;
+  g.playerX = Math.max(50*S, Math.min(W-50*S, g.playerX));
+
+  // Auto-fire (start button or up arrow)
+  if(keys['s']||keys['S']||keys['ArrowUp']||keys[' ']) {
+    if(g.bullets.length < 10) {
+      g.bullets.push({x:g.playerX-15*S, y:g.playerY-30*S, vy:-8*S});
+      g.bullets.push({x:g.playerX+15*S, y:g.playerY-30*S, vy:-8*S});
+    }
+  }
+
+  // Update bullets
+  for(var i=0; i<g.bullets.length; i++) {
+    g.bullets[i].y += g.bullets[i].vy;
+  }
+  g.bullets = g.bullets.filter(function(b){return b.y > -20;});
+
+  // Spawn enemies
+  g.spawnCounter++;
+  if(g.spawnCounter > 40) {
+    g.spawnCounter = 0;
+    var ex = 50*S + Math.random()*(W-100*S);
+    g.enemies.push({x:ex, y:-50*S, vy:2*S+Math.random()*2*S, health:2, hit:false});
+  }
+
+  // Update enemies
+  for(var i=0; i<g.enemies.length; i++) {
+    var e = g.enemies[i];
+    e.y += e.vy;
+
+    // Check bullet collision
+    for(var j=0; j<g.bullets.length; j++) {
+      var b = g.bullets[j];
+      if(Math.abs(b.x - e.x) < 20*S && Math.abs(b.y - e.y) < 20*S) {
+        e.health--;
+        g.bullets.splice(j, 1);
+        if(e.health <= 0) {
+          score += 100;
+          g.explosions.push({x:e.x, y:e.y, life:20});
+          g.enemies.splice(i, 1);
+          i--;
+        }
+        break;
+      }
+    }
+
+    // Check player collision
+    if(e.y > g.playerY - 40*S && Math.abs(e.x - g.playerX) < 30*S) {
+      g.health--;
+      g.explosions.push({x:e.x, y:e.y, life:20});
+      g.enemies.splice(i, 1);
+      i--;
+      if(g.health <= 0) {
+        endGame();
+        return;
+      }
+    }
+  }
+  g.enemies = g.enemies.filter(function(e){return e.y < H+50;});
+
+  // Update explosions
+  for(var i=0; i<g.explosions.length; i++) {
+    g.explosions[i].life--;
+  }
+  g.explosions = g.explosions.filter(function(ex){return ex.life > 0;});
+}
+
+function endGame() {
+  state = 'done';
+  window.parent.postMessage({type:'bonusComplete', score:score}, '*');
+}
+
+// ═══ RENDER ═══
+function render() {
+  ctx.fillStyle = '#000';
+  ctx.fillRect(0, 0, W, H);
+
+  // Stars
+  for(var i=0; i<stars.length; i++) {
+    var st = stars[i];
+    st.y += st.speed * st.z * S;
+    if(st.y > H) {
+      st.y = 0;
+      st.x = Math.random()*W;
+    }
+    ctx.fillStyle = 'rgba(255,255,255,'+st.z+')';
+    var sz = 1 + st.z*2;
+    ctx.fillRect(st.x, st.y, sz, sz*3);
+  }
+
+  if(state==='ready') {
+    ctx.textAlign='center';
+    ctx.fillStyle=NC;
+    ctx.font='bold '+(32*S)+'px Orbitron';
+    ctx.fillText('SPACE SHOOTER BONUS',W/2,H*0.3);
+    ctx.fillStyle='#fff';
+    ctx.font=(20*S)+'px Orbitron';
+    ctx.fillText('Move: Arrow Keys / Joystick',W/2,H*0.5);
+    ctx.fillText('Fire: START / SPACE / UP',W/2,H*0.55);
+    ctx.fillStyle=NY;
+    ctx.font='bold '+(24*S)+'px Orbitron';
+    ctx.fillText('PRESS START',W/2,H*0.7);
+    return;
+  }
+
+  if(state==='done') {
+    ctx.textAlign='center';
+    ctx.fillStyle=NP;
+    ctx.font='bold '+(36*S)+'px Orbitron';
+    ctx.fillText('MISSION COMPLETE!',W/2,H*0.4);
+    ctx.fillStyle=GD;
+    ctx.font='bold '+(32*S)+'px Orbitron';
+    ctx.fillText('SCORE: '+score,W/2,H*0.5);
+    ctx.fillStyle='#aaa';
+    ctx.font=(18*S)+'px Orbitron';
+    ctx.fillText('Returning to main game...',W/2,H*0.6);
+    return;
+  }
+
+  if(!game) return;
+  var g = game;
+
+  // Draw player ship (robot in spaceship)
+  ctx.save();
+  ctx.translate(g.playerX, g.playerY);
+  ctx.scale(S, S);
+
+  // Ship body
+  ctx.fillStyle = '#22a844';
+  ctx.beginPath();
+  ctx.moveTo(0, -30);
+  ctx.lineTo(-20, 10);
+  ctx.lineTo(20, 10);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = '#186830';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  // Cockpit (robot visible)
+  ctx.fillStyle = '#7b3fa8';
+  ctx.beginPath();
+  ctx.arc(0, -10, 8, 0, 6.28);
+  ctx.fill();
+  ctx.fillStyle = '#3366ee';
+  ctx.fillRect(-4, -15, 8, 6);
+
+  // Wings
+  ctx.fillStyle = '#3344dd';
+  ctx.fillRect(-35, 0, 15, 4);
+  ctx.fillRect(20, 0, 15, 4);
+
+  // Engines
+  ctx.fillStyle = '#ff6600';
+  ctx.fillRect(-15, 8, 6, 8);
+  ctx.fillRect(9, 8, 6, 8);
+
+  ctx.restore();
+
+  // Draw bullets
+  ctx.fillStyle = NC;
+  for(var i=0; i<g.bullets.length; i++) {
+    var b = g.bullets[i];
+    ctx.fillRect(b.x-2*S, b.y, 4*S, 12*S);
+  }
+
+  // Draw enemies
+  ctx.fillStyle = NP;
+  for(var i=0; i<g.enemies.length; i++) {
+    var e = g.enemies[i];
+    ctx.save();
+    ctx.translate(e.x, e.y);
+    ctx.scale(S, S);
+
+    // Enemy ship
+    ctx.fillStyle = '#aa3333';
+    ctx.beginPath();
+    ctx.moveTo(0, 20);
+    ctx.lineTo(-15, -10);
+    ctx.lineTo(15, -10);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = '#770000';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Enemy cockpit
+    ctx.fillStyle = '#ff6600';
+    ctx.beginPath();
+    ctx.arc(0, 0, 6, 0, 6.28);
+    ctx.fill();
+
+    ctx.restore();
+  }
+
+  // Draw explosions
+  for(var i=0; i<g.explosions.length; i++) {
+    var ex = g.explosions[i];
+    var a = ex.life / 20;
+    ctx.globalAlpha = a;
+    ctx.fillStyle = '#ff6600';
+    ctx.beginPath();
+    ctx.arc(ex.x, ex.y, (20-ex.life)*2*S, 0, 6.28);
+    ctx.fill();
+    ctx.fillStyle = '#ffff00';
+    ctx.beginPath();
+    ctx.arc(ex.x, ex.y, (20-ex.life)*S, 0, 6.28);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+
+  // HUD
+  ctx.textAlign = 'left';
+  ctx.fillStyle = '#fff';
+  ctx.font = 'bold '+(20*S)+'px Orbitron';
+  ctx.fillText('SCORE: '+score, 20*S, 30*S);
+  ctx.fillText('HEALTH: '+g.health, 20*S, 55*S);
+
+  ctx.textAlign = 'right';
+  var secs = Math.ceil(g.timer/60);
+  ctx.fillStyle = secs<=5 ? NP : NC;
+  ctx.fillText('TIME: '+secs, W-20*S, 30*S);
+}
+
+// ═══ GAME LOOP ═══
+function gameLoop() {
+  update();
+  render();
+  requestAnimationFrame(gameLoop);
+}
+
+// Auto-start if URL has ?autostart
+if(window.location.search.indexOf('autostart')!==-1) {
+  state='playing';
+  initGame();
+}
+
+gameLoop();
+</script>
+</body>
+</html>
