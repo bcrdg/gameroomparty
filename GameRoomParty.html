@@ -162,7 +162,7 @@
     <div id="tapPrompt" class="blink-text" onclick="startGame()" style="font-size:4vw;color:#0ff;letter-spacing:0.5vw;text-transform:uppercase;display:none;text-shadow:0 0 10px #0ff;cursor:pointer;padding:3vh 4vw;">TAP TO START</div>
     <div id="promoBar">
       <div class="promo-text" id="promoText">THE GAME ROOM<br>14888 PEACEFUL VALLEY RD, SONORA, CA 95370<br>(209) 536-4390</div>
-      <img class="qr-code" id="promoQR" src="https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=https://www.sonoragameroom.com/party" alt="QR Code" style="display:none;">
+      <img class="qr-code" id="promoQR" src="https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=https://bcrdg.github.io/gameroomparty" alt="QR Code" style="display:none;">
     </div>
   </div>
   <div id="gameOverScreen" style="display:none" onclick="if(!nameEntry)returnToIntro()">
@@ -2389,8 +2389,8 @@ gameLoop();
 // Arcade banners - promote online version
 const arcadeMessages = [
   {
-    text: 'PLAY ONLINE FOR FREE AT<br>WWW.SONORAGAMEROOM.COM/PARTY',
-    showQR: true,
+    text: 'TAKE A SELFIE AT THE HIGH SCORE NAME ENTRY SCREEN<br>WITH A SCORE OF 500,000 HEIGHT POINTS OR BETTER<br>FOR A FREE SANDWICH!',
+    showQR: false,
     link: null
   },
   {
