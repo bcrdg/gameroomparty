@@ -20,7 +20,8 @@ let gameMode = 'arcade'; // 'arcade' or 'online'
 - **Target:** Physical arcade cabinet at Sonora Game Room
 - **Controls:** Joystick/buttons, keyboard (Arrow keys/WASD)
 - **Start Flow:** INSERT COIN → PRESS START
-- **Name Entry:** On-screen keyboard (arrow keys to navigate, S to select)
+- **Credits:** Coins accumulate as credits (`credits` counter, visible on screen when > 0). Each game start decrements the counter, so multiple coins → multiple games queued.
+- **Name Entry:** On-screen keyboard (arrow keys to navigate, S to select). Keyboard includes dedicated DEL, SPACE, and DONE keys on the bottom row.
 - **Leaderboard:** Saves to "Arcade Players" in JSONBin
 
 #### Online Mode (`gameMode = 'online'`)
@@ -35,14 +36,13 @@ let gameMode = 'arcade'; // 'arcade' or 'online'
 ```
 GameRoomParty/
 ├── GameRoomParty.html     # Main game file (arcade mode by default)
-├── bonus_stage.html       # Bridge bonus level (iframe)
-├── bonus_stage_space.html # Space shooter bonus level (iframe)
+├── bonus_stage.html       # Bridge bonus level (iframe, arcade only)
+├── bonus_stage_space.html # Space shooter bonus level (iframe, arcade only)
+├── launch.bat             # Kiosk-mode Edge launcher for the arcade cabinet
 ├── Music/                 # Audio files
 │   ├── menu.mp3
-│   ├── gameover.mp3
-│   ├── bonus.mp3
 │   └── gameplay/
-│       ├── track1.mp3 - track29.mp3
+│       ├── track1.mp3 - track31.mp3  # track30/31 are former bonus/gameover tracks
 │       └── tracks.json
 ├── images/               # Character drop event images
 │   ├── nate_french_fries.png
@@ -94,9 +94,15 @@ const JSONBIN_KEY = '$2a$10$...'; // Master key for writes
 - High score entry triggered if you qualify for either leaderboard
 
 ### Promotional Features
-Rotating banner at bottom of start screen (8-second intervals):
-1. "Play online at www.sonoragameroom.com/party" (with QR code)
-2. "Take a selfie at the enter name screen with an arcade height score of 1 million or higher for a free sandwich!"
+Rotating banner at bottom of start screen (8-second intervals). The two arrays
+`arcadeMessages` and `onlineMessages` are completely separate and chosen by
+`gameMode`.
+
+**Arcade banners:**
+1. "Take a selfie at the high score name entry screen with a score of 500,000 height points or better for a free sandwich!" (no QR)
+2. "Scan to play on your phone! Compete with players around the world" — QR code points to https://bcrdg.github.io/gameroomparty
+
+**Online banners (8 total)** rotate through address/hours, food specials, pool hall, bingo, Sunday funday, menu link, and events calendar link. None show the QR (`showQR: false` on all).
 
 ## 🎨 Game Features
 
@@ -117,11 +123,12 @@ Rotating banner at bottom of start screen (8-second intervals):
 - **Helicopter** - Controlled hover
 
 ### Special Events
-- **Bonus Stages** - Collect 3 quarters to trigger one of two bonus levels:
-  - **Bridge Stage** - Navigate 3D perspective bridge, collect quarters while avoiding bombs
-  - **Space Shooter** - Swordfish II-style rail shooter with 3 enemy types, boss battle, and powerups
+- **Bonus Stages** — *arcade mode only.* Collect 3 quarters to trigger one of two bonus levels:
+  - **Bridge Stage** (`bonus_stage.html`) - Navigate 3D perspective bridge, collect quarters while avoiding bombs
+  - **Space Shooter** (`bonus_stage_space.html`) - Swordfish II-style rail shooter with 3 enemy types (fighter / tank / weaver), boss battle at 15 seconds remaining, and weapon powerups (spread / rapid / health)
   - First bonus is randomly selected, then alternates between the two
-  - Both use iframe with identical launch sequence and score return mechanism
+  - Both use iframe with identical launch sequence and score return mechanism (`postMessage` on completion)
+- **Online Mode Coin Behavior** — Bonus stages are skipped in online mode. Each collected coin instead awards **50,000 points** directly to the player's score.
 - **Character Drops** - Nate (fries +1500pts), Peter (quarters +1500pts), Cody (spicy wings -500pts)
 
 ### Death Phrases
@@ -131,6 +138,28 @@ Rotating banner at bottom of start screen (8-second intervals):
 - "CERTIFIED BRUH MOMENT"
 - "L + RATIO"
 - And many more!
+
+## 🕹️ Arcade Hardware (XIN-MO Dual Arcade USB Encoder)
+
+The cabinet uses a **XIN-MO Dual Arcade USB encoder** which Windows enumerates as a standard HID gamepad ("XIN-MO Dual Arcade"). The game polls `navigator.getGamepads()` every frame and synthesizes synthetic `keydown` / `keyup` events so the rest of the input code (which is keyboard-driven) continues to work unchanged.
+
+Both `GameRoomParty.html` and `bonus_stage_space.html` implement the same polling loop. `bonus_stage.html` does not yet have gamepad support added (the bridge stage relied on existing keyboard handling).
+
+### Physical Button → Index → Synthesized Key
+| Physical input | Gamepad button | Synthesized key | Notes |
+|---|---|---|---|
+| Joystick LEFT  | B0 | `ArrowLeft`  | held → key held |
+| Joystick DOWN  | B1 | `ArrowDown`  | held → key held |
+| Joystick UP    | B2 | `ArrowUp`    | held → key held |
+| Joystick RIGHT | B3 | `ArrowRight` | held → key held |
+| START button   | B4 | `s`          | one-shot keydown on press |
+| COIN switch    | B7 | `c`          | **active-low** (see below) |
+
+### Coin Switch Quirk
+The coin microswitch on the cabinet is **normally closed** — B7 reads as *pressed* in the resting state and *releases* the moment a coin passes through. The poll loop watches for that falling edge (`pressed → released`) and dispatches a `keydown` for `c`. There's also a `padCoinArmed` flag that requires the button to be observed in its pressed state at least once before any release will fire a coin event, which prevents spurious "coin inserted" events on browser/gamepad connection glitches.
+
+### Kiosk Launcher
+`launch.bat` opens the game in Edge's kiosk mode. This is what the arcade cabinet uses to boot directly into the game with no browser chrome visible.
 
 ## 🛠️ Development Guidelines
 
@@ -198,6 +227,12 @@ const DEATH_PHRASES = [
 - Mobile touch controls could use better visual feedback
 - No pause functionality currently
 - Space shooter bonus level uses procedural canvas drawing for all graphics (no sprite sheets)
+- Bridge bonus stage (`bonus_stage.html`) does not yet have XIN-MO gamepad polling
+
+## 📐 Display & Layout Notes
+- On desktop browsers in **online mode**, the game canvas is constrained to arcade-cabinet proportions (tall, narrow) and centered rather than filling the whole window — keeps gameplay consistent across deployments.
+- Coordinate scaling factor `S = W / BASE_W` (where `BASE_W = 420`) is used throughout for resolution-independent rendering. When adding new gameplay objects, scale positions, sizes, and velocities by `S`. Off-screen cull thresholds also need to scale with `S` — a fixed `y < -100` cutoff will incorrectly delete newly-spawned enemies on any wide window.
+- Death phrases auto-shrink via `ctx.measureText()` until they fit within 90% of the canvas width, so any phrase length works on any screen.
 
 ## 🎯 Future Enhancements
 - Add pause menu
